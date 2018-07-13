@@ -1,0 +1,67 @@
+{
+    // See https://go.microsoft.com/fwlink/?LinkId=733558
+    // for the documentation about the tasks.json format
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "GCC Debug",
+            "type": "shell",
+            "group": "build",
+            "command": "gcc -g \"./${relativeFile}\" -o \"${workspaceFolder}/debug/${fileBasenameNoExtension}_c\"",
+            "presentation": {
+                "echo": false,
+                "reveal": "silent",
+                "focus": false,
+                "panel": "shared"
+            },
+            "problemMatcher": [
+                "$gcc"
+            ]
+        },
+        {
+            "label": "Clang++ Debug",
+            "type": "shell",
+            "group": "build",
+            "command": "clang++ -g -Wall \"./${relativeFile}\" -o \"${workspaceFolder}/debug/${fileBasenameNoExtension}_cpp\"",
+            "presentation": {
+                "echo": false,
+                "reveal": "silent",
+                "focus": false,
+                "panel": "shared"
+            },
+            "problemMatcher": [
+                "$gcc"
+            ]
+        },
+        {
+            "label": "GCC release",
+            "type": "shell",
+            "group": "build",
+            "command": "gcc \"./${relativeFile}\" -o \"${workspaceFolder}/release/${fileBasenameNoExtension}_c\"",
+            "presentation": {
+                "echo": false,
+                "reveal": "silent",
+                "focus": false,
+                "panel": "shared"
+            },
+            "problemMatcher": [
+                "$gcc"
+            ]
+        },
+        {
+            "label": "Clang++ release",
+            "type": "shell",
+            "group": "build",
+            "command": "clang++ -Wall \"./${relativeFile}\" -o \"${workspaceFolder}/release/${fileBasenameNoExtension}_cpp\"",
+            "presentation": {
+                "echo": false,
+                "reveal": "silent",
+                "focus": false,
+                "panel": "shared"
+            },
+            "problemMatcher": [
+                "$gcc"
+            ]
+        }
+    ]
+}
