@@ -4,18 +4,39 @@
     // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
+        
         {
-            "name": "(lldb) Launch",
+            "name": "Launch",
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceRoot}/debug//${fileBasenameNoExtension}_cpp",
-            "args": ["mac"],
-            "stopAtEntry": false,
-            "cwd": "${workspaceRoot}/debug/",
-            "environment": [],
-            "externalConsole": false,
-            "MIMode": "lldb",
-            "preLaunchTask": "Clang++ Debug"
+            "osx": {
+                "name": "(lldb) Launch",
+                "stopAtEntry": false,
+                "cwd": "${workspaceRoot}/debug/",
+                "args": ["config.ini"],
+                "environment": [],
+                "externalConsole": false,
+                "MIMode": "lldb",
+                "preLaunchTask": "Clang++ Debug"
+            },
+            "linux": {
+                "name": "(lldb) Launch",
+                "args": ["config_lianli.ini"],
+                "stopAtEntry": false,
+                "cwd": "${workspaceRoot}/debug/",
+                "environment": [],
+                "externalConsole": true,
+                "MIMode": "lldb",
+                "preLaunchTask": "Clang++ Debug",
+                // "setupCommands": [
+                //     {
+                //         "description": "Enable pretty-printing for gdb",
+                //         "text": "-exec -enable-pretty-printing",
+                //         "ignoreFailures": true
+                //     }
+                // ]
+            }
         }
     ]
 }

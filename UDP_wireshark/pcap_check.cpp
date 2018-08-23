@@ -149,6 +149,26 @@ void save_index_raw(std::string filename, char *index_raw)
     return;
 }
 
+void check_index_raw(char *index_raw)
+{
+    int grp = 0;
+    int cnt = 0;
+    int check_no = 0;
+    int temp = 0;
+    while (grp < PACKET_SUM_PER_INTERFACE)
+    {
+        cnt = 0;
+        temp = (int)index_raw[5 * grp + 1];
+        
+        if (temp != check_no % 75) {
+            std::cout << "ERROR :: The order is wrong." << std::endl;
+        }
+
+        check_no++;
+        grp++;
+    }
+}
+
 int sort_packets_per_lan(FilePath filepath)
 // 把 wireshark 抓到的包（单根网线上的包）排序
 {
@@ -169,7 +189,8 @@ int sort_packets_per_lan(FilePath filepath)
         std::cout << "ERROR :: read_pcap_2_memory error!" << std::endl;
         return 0;
     }
-    save_index_raw(filepath.filename_without_ext + (std::string) "_index.txt", index_raw);
+    // save_index_raw(filepath.filename_without_ext + (std::string) "_index.txt", index_raw);
+    check_index_raw(index_raw);
     return 1;
 }
 

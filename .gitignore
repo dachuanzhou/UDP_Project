@@ -1,1 +1,6 @@
 *_index.txt
+debug/*_c
+debug/*_cpp
+debug/*.dSYM/
+release/*_cpp
+release/*_c
