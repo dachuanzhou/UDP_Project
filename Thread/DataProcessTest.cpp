@@ -62,16 +62,18 @@ int main(int argc, char const *argv[])
     Patient *pptr = new Patient(config.storage_path, id, name);
     DataProcess *ptr = new DataProcess(config, *pptr);
 
-    if (ptr->load_slice(slice_index) == 1)
+    if (ptr->load_slice(slice_index) != 1)
     {
-        std::cout << "Slice " << slice_index << " : "
-                  << "pcap from " << config.raw_data_ids[0] << " to " << config.raw_data_ids[config.raw_data_ids.size() - 1] << " load successful." << std::endl;
+        std::cout << "ERROR :: Slice " << slice_index << " : "
+                  << "pcap from " << config.raw_data_ids[0] << " to " << config.raw_data_ids[config.raw_data_ids.size() - 1] << " load failed." << std::endl;
     }
+    std::cout << "Slice " << slice_index << " : "
+              << "pcap from " << config.raw_data_ids[0] << " to " << config.raw_data_ids[config.raw_data_ids.size() - 1] << " load successful." << std::endl;
     auto end_time = std::chrono::high_resolution_clock::now();
     std::cout << std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time_main).count() << "ms for load pcap files." << std::endl;
 
     auto start_time_check = std::chrono::high_resolution_clock::now();
-    if (ptr->check_index_data())
+    if (ptr->check_index_data() != 1)
     {
         std::cout << "ERROR :: slice " << slice_index << " order error." << std::endl;
         return 0;
@@ -80,7 +82,7 @@ int main(int argc, char const *argv[])
     std::cout << std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time_check).count() << "ms for check package order." << std::endl;
 
     auto start_time_decode = std::chrono::high_resolution_clock::now();
-    if (ptr->decode_slice() != 1)
+    if (ptr->map_raw_2_decode() != 1)
     {
         std::cout << "ERROR :: slice " << slice_index << " decode error." << std::endl;
         return 0;

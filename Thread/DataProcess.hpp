@@ -38,11 +38,13 @@ class DataProcess
     int end_file_index;
     bool flag_raw_data_ready;
     bool flag_decode_data_ready;
+
     /* function */
     inline unsigned int read_as_int(char *ptr);
     int read_pcap_2_memory(std::string filepath, char *packets_raw, char *index_raw);
     void check_udp_packets_order(std::string filepath);
-    void convert_14bits_to_16bits(long long raw_data_index, long long decode_data_index, long long size);
+    inline void convert_14bits_to_16bits(long long raw_data_index, long long decode_data_index);
+    void process_tables(int start_table_index, int tables_per_thread, int board_sum);
 
   public:
     /* data */
@@ -57,6 +59,7 @@ class DataProcess
     int load_slice(int index);
     int check_index_data();
     int decode_slice();
+    int map_raw_2_decode();
 };
 
 DataProcess::DataProcess(Config in_config, Patient in_patient) : config(in_config), patient(in_patient)
@@ -117,6 +120,7 @@ int DataProcess::load_slice(int index)
 
 int DataProcess::check_index_data()
 // 利用 read_pcap_2_memory 读取的 index_data 内容识别是否有 UDP 包乱序
+// 检测完成，没有问题返回 1
 {
     long long cnt = 0;
     long long check_no = 0;
@@ -133,59 +137,7 @@ int DataProcess::check_index_data()
 
         check_no++;
     }
-    return 0;
-}
-
-int DataProcess::decode_slice()
-// 把 raw_data 解码到 decode_data
-{
-    int thread_decode_sum = config.program_decode_pcap_threads_sum;
-    decode_data_length = (end_file_index - start_file_index + 1) * (long long)PACKET_SUM_PER_INTERFACE * 1600 / 2;
-    // decode_data_length = 32;
-    decode_data = (int16_t *)std::calloc(decode_data_length, 2);
-
-    if (((long long)raw_data_length / thread_decode_sum) % 56 != 0)
-        {
-            std::cout << "ERROR :: thread_decode_sum is not N x 56." << std::endl;
-        }
-
-    boost::asio::thread_pool threadpool(thread_decode_sum);
-    for (int i = 0; i < thread_decode_sum; i++)
-    {
-        boost::asio::post(threadpool, boost::bind(&DataProcess::convert_14bits_to_16bits, this, raw_data_length / (long long)thread_decode_sum * i, decode_data_length / (long long)thread_decode_sum * i, (long long)raw_data_length / thread_decode_sum));
-        // convert_14bits_to_16bits(raw_data_length / (long long)thread_decode_sum * i, decode_data_length / (long long)thread_decode_sum * i, (long long)raw_data_length / thread_decode_sum);
-        // std::cout << i << "done." << std::endl;
-    }
-    threadpool.join();
-
-    free(raw_data);
-    free(index_data);
     return 1;
-}
-
-void DataProcess::convert_14bits_to_16bits(long long raw_data_index, long long decode_data_index, long long size)
-// 从 pointer_14 读取 14 个字节（8个 samples，转换为 8个 int16_t （16bits）
-// 循环四次，转换32个 samples，正好对应32个通道的 samples
-// 调用一次转换 56 bytes
-{
-    int16_t *ptr;
-    char *pointer_14 = &raw_data[raw_data_index];
-    int16_t *pointer_16 = &decode_data[decode_data_index];
-
-    // TODO :: 需要根据条带化顺序修改 pointer_16 的索引位置
-    for (long long i = 0; i < 4 * (size / 56); i++)
-    {
-        ptr = (int16_t *)&pointer_14[14 * i];
-        pointer_16[8 * i + 0] = (ptr[0] & 0xfffc) / 4;
-        pointer_16[8 * i + 1] = ((((ptr[0] & 0x3) << 12) | (ptr[1] >> 4)) << 4) / 4;
-        pointer_16[8 * i + 2] = ((((ptr[1] & 0xf) << 10) | (ptr[2] >> 6)) << 4) / 4;
-        pointer_16[8 * i + 3] = ((((ptr[2] & 0x3f) << 8) | (ptr[3] >> 8)) << 4) / 4;
-        pointer_16[8 * i + 4] = ((((ptr[3] & 0xff) << 6) | (ptr[4] >> 10)) << 4) / 4;
-        pointer_16[8 * i + 5] = ((((ptr[4] & 0x3ff) << 4) | (ptr[5] >> 12)) << 4) / 4;
-        pointer_16[8 * i + 6] = ((((ptr[5] & 0xfff) << 2) | (ptr[6] >> 14)) << 4) / 4;
-        pointer_16[8 * i + 7] = (ptr[6] << 2) / 4;
-    }
-    return;
 }
 
 inline unsigned int DataProcess::read_as_int(char *ptr)
@@ -270,4 +222,105 @@ int DataProcess::read_pcap_2_memory(std::string filepath, char *packets_raw, cha
     {
         return 0;
     }
+}
+
+inline void DataProcess::convert_14bits_to_16bits(long long raw_data_index, long long decode_data_index)
+// 从 pointer_14 读取 14 个字节（8个 samples，转换为 8个 int16_t （16bits）
+// 循环四次，转换32个 samples，正好对应32个通道的 samples
+// 调用一次转换 56 bytes
+{
+    int16_t *ptr;
+    char *pointer_14 = &raw_data[raw_data_index];
+    int16_t *pointer_16 = &decode_data[decode_data_index];
+
+    // TODO :: 需要根据条带化顺序修改 pointer_16 的索引位置
+    for (long long i = 0; i < 4; i++)
+    {
+        ptr = (int16_t *)&pointer_14[14 * i];
+        pointer_16[8 * i + 0] = (ptr[0] & 0xfffc) / 4;
+        pointer_16[8 * i + 1] = ((((ptr[0] & 0x3) << 12) | (ptr[1] >> 4)) << 4) / 4;
+        pointer_16[8 * i + 2] = ((((ptr[1] & 0xf) << 10) | (ptr[2] >> 6)) << 4) / 4;
+        pointer_16[8 * i + 3] = ((((ptr[2] & 0x3f) << 8) | (ptr[3] >> 8)) << 4) / 4;
+        pointer_16[8 * i + 4] = ((((ptr[3] & 0xff) << 6) | (ptr[4] >> 10)) << 4) / 4;
+        pointer_16[8 * i + 5] = ((((ptr[4] & 0x3ff) << 4) | (ptr[5] >> 12)) << 4) / 4;
+        pointer_16[8 * i + 6] = ((((ptr[5] & 0xfff) << 2) | (ptr[6] >> 14)) << 4) / 4;
+        pointer_16[8 * i + 7] = (ptr[6] << 2) / 4;
+    }
+
+    return;
+}
+
+void DataProcess::process_tables(int start_table_index, int tables_per_thread, int board_sum)
+{
+    for (int cur_table_index = start_table_index; cur_table_index < tables_per_thread + start_table_index; cur_table_index++)
+    {
+
+        for (int double_column_index = 0; double_column_index < 1875; double_column_index++)
+        {
+
+            for (int board_id = 0; board_id < board_sum; board_id++)
+            {
+                convert_14bits_to_16bits((long long)860160000 * (0 + board_id * 4) + cur_table_index * (long long)420000 + double_column_index * 56, cur_table_index * board_sum * (long long)960000 + double_column_index * board_sum * (long long)512 + board_id * 256);
+                convert_14bits_to_16bits((long long)860160000 * (2 + board_id * 4) + cur_table_index * (long long)420000 + double_column_index * 56, cur_table_index * board_sum * (long long)960000 + double_column_index * board_sum * (long long)512 + board_id * 256 + 32);
+                convert_14bits_to_16bits((long long)860160000 * (0 + board_id * 4) + cur_table_index * (long long)420000 + (double_column_index + 1875) * 56, cur_table_index * board_sum * (long long)960000 + double_column_index * board_sum * (long long)512 + board_id * 256 + 64);
+                convert_14bits_to_16bits((long long)860160000 * (2 + board_id * 4) + cur_table_index * (long long)420000 + (double_column_index + 1875) * 56, cur_table_index * board_sum * (long long)960000 + double_column_index * board_sum * (long long)512 + board_id * 256 + 96);
+                convert_14bits_to_16bits((long long)860160000 * (0 + board_id * 4) + cur_table_index * (long long)420000 + (double_column_index + 3750) * 56, cur_table_index * board_sum * (long long)960000 + double_column_index * board_sum * (long long)512 + board_id * 256 + 128);
+                convert_14bits_to_16bits((long long)860160000 * (2 + board_id * 4) + cur_table_index * (long long)420000 + (double_column_index + 3750) * 56, cur_table_index * board_sum * (long long)960000 + double_column_index * board_sum * (long long)512 + board_id * 256 + 160);
+                convert_14bits_to_16bits((long long)860160000 * (0 + board_id * 4) + cur_table_index * (long long)420000 + (double_column_index + 5625) * 56, cur_table_index * board_sum * (long long)960000 + double_column_index * board_sum * (long long)512 + board_id * 256 + 192);
+                convert_14bits_to_16bits((long long)860160000 * (2 + board_id * 4) + cur_table_index * (long long)420000 + (double_column_index + 5625) * 56, cur_table_index * board_sum * (long long)960000 + double_column_index * board_sum * (long long)512 + board_id * 256 + 224);
+
+                convert_14bits_to_16bits((long long)860160000 * (1 + board_id * 4) + cur_table_index * (long long)420000 + double_column_index * 56, cur_table_index * board_sum * (long long)960000 + double_column_index * board_sum * (long long)512 + board_sum * 256 + board_id * 256);
+                convert_14bits_to_16bits((long long)860160000 * (3 + board_id * 4) + cur_table_index * (long long)420000 + double_column_index * 56, cur_table_index * board_sum * (long long)960000 + double_column_index * board_sum * (long long)512 + board_sum * 256 + board_id * 256 + 32);
+                convert_14bits_to_16bits((long long)860160000 * (1 + board_id * 4) + cur_table_index * (long long)420000 + (double_column_index + 1875) * 56, cur_table_index * board_sum * (long long)960000 + double_column_index * board_sum * (long long)512 + board_sum * 256 + board_id * 256 + 64);
+                convert_14bits_to_16bits((long long)860160000 * (3 + board_id * 4) + cur_table_index * (long long)420000 + (double_column_index + 1875) * 56, cur_table_index * board_sum * (long long)960000 + double_column_index * board_sum * (long long)512 + board_sum * 256 + board_id * 256 + 96);
+                convert_14bits_to_16bits((long long)860160000 * (1 + board_id * 4) + cur_table_index * (long long)420000 + (double_column_index + 3750) * 56, cur_table_index * board_sum * (long long)960000 + double_column_index * board_sum * (long long)512 + board_sum * 256 + board_id * 256 + 128);
+                convert_14bits_to_16bits((long long)860160000 * (3 + board_id * 4) + cur_table_index * (long long)420000 + (double_column_index + 3750) * 56, cur_table_index * board_sum * (long long)960000 + double_column_index * board_sum * (long long)512 + board_sum * 256 + board_id * 256 + 160);
+                convert_14bits_to_16bits((long long)860160000 * (1 + board_id * 4) + cur_table_index * (long long)420000 + (double_column_index + 5625) * 56, cur_table_index * board_sum * (long long)960000 + double_column_index * board_sum * (long long)512 + board_sum * 256 + board_id * 256 + 192);
+                convert_14bits_to_16bits((long long)860160000 * (3 + board_id * 4) + cur_table_index * (long long)420000 + (double_column_index + 5625) * 56, cur_table_index * board_sum * (long long)960000 + double_column_index * board_sum * (long long)512 + board_sum * 256 + board_id * 256 + 224);
+            }
+        }
+    }
+
+    return;
+}
+
+int DataProcess::map_raw_2_decode()
+{
+    int board_sum;
+    board_sum = (end_file_index - start_file_index + 1) / 4;
+
+    decode_data_length = (end_file_index - start_file_index + 1) * (long long)PACKET_SUM_PER_INTERFACE * 1600 / 2;
+    // decode_data_length = 32;
+    decode_data = (int16_t *)std::calloc(decode_data_length, 2);
+
+    if ((end_file_index - start_file_index + 1) % 4 != 0)
+    {
+        std::cout << "ERROR :: The sum of ports must be times of 4.";
+    }
+
+    int tables_per_thread = 2048 / config.program_decode_pcap_threads_sum;
+    int rest_tables = 2048 % config.program_decode_pcap_threads_sum;
+    boost::asio::thread_pool threadpool(config.program_decode_pcap_threads_sum);
+
+    for (int thread_index = 0; thread_index < config.program_decode_pcap_threads_sum; thread_index++)
+    {
+        // process_tables(thread_index * tables_per_thread, tables_per_thread, board_sum);
+        boost::asio::post(threadpool, boost::bind(&DataProcess::process_tables, this, thread_index * tables_per_thread, tables_per_thread, board_sum));
+
+        // std::cout << "Info :: table from " << (thread_index * tables_per_thread) << " to " << (thread_index * tables_per_thread + tables_per_thread - 1) << std::endl;
+    }
+
+    if (rest_tables != 0)
+    {
+        // process_tables(tables_per_thread * config.program_decode_pcap_threads_sum, rest_tables, board_sum);
+        boost::asio::post(threadpool, boost::bind(&DataProcess::process_tables, this, tables_per_thread * config.program_decode_pcap_threads_sum, rest_tables, board_sum));
+
+    }
+
+    // 用线程池的时候要 join()
+    threadpool.join();
+
+    free(raw_data);
+    free(index_data);
+    return 1;
 }
