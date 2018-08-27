@@ -90,9 +90,6 @@ int main(int argc, char const *argv[])
     end_time = std::chrono::high_resolution_clock::now();
     std::cout << std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time_decode).count() << "ms for decode data." << std::endl;
 
-    free(pptr);
-    free(ptr);
-
     auto start_time_save = std::chrono::high_resolution_clock::now();
     if (ptr->save_decode_data() != 1)
     {
@@ -101,6 +98,9 @@ int main(int argc, char const *argv[])
     }
     end_time = std::chrono::high_resolution_clock::now();
     std::cout << std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time_save).count() << "ms for save decode data." << std::endl;
+
+    free(pptr);
+    free(ptr);
 
     end_time = std::chrono::high_resolution_clock::now();
     std::cout << std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time_main).count() << "ms" << std::endl;

@@ -327,6 +327,7 @@ int DataProcess::map_raw_2_decode()
     free(index_data);
     flag_raw_data_ready = false;
     flag_decode_data_ready = true;
+
     return 1;
 }
 
