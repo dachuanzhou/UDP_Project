@@ -18,8 +18,10 @@
 #include <boost/thread.hpp>
 #include <boost/atomic.hpp>
 #include <vector>
-#include <string.h>
+#include <string>
 #include <fstream>
+#include <sstream>
+#include <iomanip>
 #include "Patient.hpp"
 #include "Config.hpp"
 
@@ -339,18 +341,30 @@ int DataProcess::save_decode_data()
         return 0;
     }
 
-    std::string save_file = config.storage_path + patient.id + "_" + patient.name + "/" + std::to_string(cur_index_id) + "/decode_data.bin";
-    std::ofstream f_stream(save_file, std::fstream::out);
-    if (f_stream)
+    std::stringstream ss;
+
+    int board_sum = (end_file_index - start_file_index + 1) / 4;
+
+    std::string save_file = config.storage_path + patient.id + "_" + patient.name + "/" + std::to_string(cur_index_id) + "/decode_data";
+
+    for (int table_index = 0; table_index < 2048; table_index++)
     {
-        f_stream.write((char *)&decode_data[0], (long long)decode_data_length * 2);
-
-        if (f_stream.good())
+        ss << std::setw(4) << std::setfill('0') << table_index;
+        std::ofstream f_stream(save_file + ss.str() + ".bin", std::fstream::out);
+        ss.str("");
+        if (f_stream)
         {
-            return 1;
-        }
+            f_stream.write((char *)&decode_data[(long long)960000 * board_sum * table_index], 1920000 * board_sum);
 
-        return 0;
+            if (f_stream.good())
+            {
+                f_stream.close();
+            }
+            else
+            {
+                return 0;
+            }
+        }
     }
-    return 0;
+    return 1;
 }
