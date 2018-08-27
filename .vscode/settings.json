@@ -78,7 +78,10 @@
         "__bit_reference": "cpp",
         "cfenv": "cpp",
         "unordered_set": "cpp",
-        "semaphore.h": "c"
+        "semaphore.h": "c",
+        "__hash_table": "cpp",
+        "queue": "cpp",
+        "stack": "cpp"
     },
     "cSpell.enabled": false
 }

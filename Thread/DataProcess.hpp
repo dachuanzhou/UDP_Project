@@ -19,6 +19,7 @@
 #include <boost/atomic.hpp>
 #include <vector>
 #include <string.h>
+#include <fstream>
 #include "Patient.hpp"
 #include "Config.hpp"
 
@@ -38,6 +39,7 @@ class DataProcess
     int end_file_index;
     bool flag_raw_data_ready;
     bool flag_decode_data_ready;
+    int cur_index_id;
 
     /* function */
     inline unsigned int read_as_int(char *ptr);
@@ -60,6 +62,7 @@ class DataProcess
     int check_index_data();
     int decode_slice();
     int map_raw_2_decode();
+    int save_decode_data();
 };
 
 DataProcess::DataProcess(Config in_config, Patient in_patient) : config(in_config), patient(in_patient)
@@ -89,6 +92,7 @@ int DataProcess::load_slice(int index)
         return -1;
     }
 
+    cur_index_id = index;
     std::string filepath;
     raw_data_length = (end_file_index - start_file_index + 1) * (long long)PACKET_SUM_PER_INTERFACE * VALID_BYTES_LENGTH_PER_PACKAGE;
     index_data_length = (end_file_index - start_file_index + 1) * (long long)PACKET_SUM_PER_INTERFACE * FLAG_BITS_PER_PACKAGE;
@@ -114,7 +118,7 @@ int DataProcess::load_slice(int index)
     threadpool.join();
 
     // printf("raw_data_length = %lld, index_data_length = %lld, decode_data_length = %lld\n", raw_data_length, index_data_length, decode_data_length);
-
+    flag_raw_data_ready = true;
     return 1;
 }
 
@@ -314,7 +318,6 @@ int DataProcess::map_raw_2_decode()
     {
         // process_tables(tables_per_thread * config.program_decode_pcap_threads_sum, rest_tables, board_sum);
         boost::asio::post(threadpool, boost::bind(&DataProcess::process_tables, this, tables_per_thread * config.program_decode_pcap_threads_sum, rest_tables, board_sum));
-
     }
 
     // 用线程池的时候要 join()
@@ -322,5 +325,31 @@ int DataProcess::map_raw_2_decode()
 
     free(raw_data);
     free(index_data);
+    flag_raw_data_ready = false;
+    flag_decode_data_ready = true;
     return 1;
+}
+
+int DataProcess::save_decode_data()
+{
+
+    if (flag_decode_data_ready == false)
+    {
+        return 0;
+    }
+
+    std::string save_file = config.storage_path + patient.id + "_" + patient.name + "/" + std::to_string(cur_index_id) + "/decode_data.bin";
+    std::ofstream f_stream(save_file, std::fstream::out);
+    if (f_stream)
+    {
+        f_stream.write((char *)&decode_data[0], (long long)decode_data_length * 2);
+
+        if (f_stream.good())
+        {
+            return 1;
+        }
+
+        return 0;
+    }
+    return 0;
 }

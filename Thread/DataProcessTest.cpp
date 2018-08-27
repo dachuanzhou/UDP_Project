@@ -93,6 +93,15 @@ int main(int argc, char const *argv[])
     free(pptr);
     free(ptr);
 
+    auto start_time_save = std::chrono::high_resolution_clock::now();
+    if (ptr->save_decode_data() != 1)
+    {
+        std::cout << "ERROR :: save decode data error." << std::endl;
+        return 0;
+    }
+    end_time = std::chrono::high_resolution_clock::now();
+    std::cout << std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time_save).count() << "ms for save decode data." << std::endl;
+
     end_time = std::chrono::high_resolution_clock::now();
     std::cout << std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time_main).count() << "ms" << std::endl;
 
