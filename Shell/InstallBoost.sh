@@ -14,8 +14,7 @@
 # Version [1.0]
 #  下载、安装 boost 库
 
-rm -f boost_1_68_0.tar.gz
-wget https://dl.bintray.com/boostorg/release/1.68.0/source/boost_1_68_0.tar.gz
+# wget https://dl.bintray.com/boostorg/release/1.68.0/source/boost_1_68_0.tar.gz
 tar zxf boost_1_68_0.tar.gz
 rm -f boost_1_68_0.tar.gz
 cd boost_1_68_0
