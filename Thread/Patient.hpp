@@ -23,6 +23,7 @@
 class Patient
 {
 private:
+    int creat_template(std::string storage_path, std::string id, std::string name);
     int load_info(std::string storage_path, std::string id, std::string name);
     
 public:
@@ -46,10 +47,9 @@ public:
 
     Patient();
     Patient(std::string storage_path, std::string id, std::string name);
-    int creat_template();
     void print_info();
-    void path_of_pcapfile_from_slice(int slice_no, std::string paths[32]);
-    std::string path_of_pcapfile_from_slice(int slice_no, int port_no);
+    bool path_of_pcapfile_from_slice(std::string slice_id, std::string paths[32]);
+    std::string path_of_pcapfile_from_slice(std::string slice_id, int port_no);
     ~Patient();
 };
 
@@ -61,23 +61,28 @@ Patient::Patient(std::string storage_path, std::string id, std::string name)
 {
     this->name = name;
     this->id = id;
-    load_info(storage_path.c_str(), id, name);
+    if (load_info(storage_path.c_str(), id, name) != 0) {
+        creat_template(storage_path.c_str(), id, name);
+        exit(-1);
+    }
 }
 
-int Patient::creat_template()
+int Patient::creat_template(std::string storage_path, std::string id, std::string name)
 // 把病人信息保存到信息存储路径下
 {
+    std::string path = storage_path + id + "_" + name + "/patient.txt";
     boost::property_tree::ptree ptree;
-    ptree.add("Name", "TEST");
-    ptree.add("Age", 30);
-    ptree.add("ID", "1");
+    ptree.add("Name", "NULL");
+    ptree.add("Age", 0);
+    ptree.add("ID", "NULL");
     ptree.add("Gender", "NULL");
     ptree.add("Phone", "NULL");
     ptree.add("Check_Date", "NULL");
-    ptree.add("Comment", "For test");
-    ptree.add("Data_Path", "/home/haixiang/WorkSpace/PatientArchieve");
-    ptree.add("Slice_Sum", 1);
-    boost::property_tree::ini_parser::write_ini("patient.txt", ptree);
+    ptree.add("Comment", "Template");
+    ptree.add("Data_Path", storage_path);
+    ptree.add("Slice_Sum", 60);
+    boost::property_tree::ini_parser::write_ini(path.c_str(), ptree);
+    std::cout << "Patient info file: [" << path << "]: has been created, please modify it.";
     return 0;
 }
 
@@ -85,6 +90,11 @@ int Patient::load_info(std::string storage_path, std::string id, std::string nam
 // 根据 ID 和 Name 读取病人基本信息
 {
     std::string path = storage_path + id + "_" + name + "/patient.txt";
+    if (access(path.c_str(), 0) != 0)
+    {
+        std::cout << "ERROR :: no patient info exsits." << std::endl;
+        return -1;
+    }
     boost::property_tree::ptree ptree;
     boost::property_tree::ini_parser::read_ini(path, ptree);
 
@@ -113,33 +123,37 @@ void Patient::print_info()
     std::cout << "---------- Patient Info Done. ----------" << std::endl << std::endl;
 }
 
-void Patient::path_of_pcapfile_from_slice(int slice_no, std::string paths[32])
-// 根据 slice_no 返回文件的列表: paths
+bool Patient::path_of_pcapfile_from_slice(std::string slice_id, std::string paths[32])
+// 根据 slice_id 返回文件的列表: paths
 {
-    if (slice_no > slice_sum)
+    std::string path = data_path + id + "_" + name + "/" + slice_id;
+    if (access(path.c_str(), 0) != 0)
     {
-        std::cout << "ERROR :: Current slice not exsited." << std::endl;
-        return;
+        std::cout << "ERROR :: Slice " << slice_id << " not exsited." << std::endl;
+        return false;
     }
-    std::string path = data_path + id + "_" + name + "/" + std::to_string(slice_no) + "/DatPort";
+
+    path = path + "/DatPort";
 
     for (size_t i = 0; i < 32; i++)
     {
         paths[i] = path + std::to_string(i) + ".pcap";
     }
-    return;
+    return true;
 }
 
-std::string Patient::path_of_pcapfile_from_slice(int slice_no, int port_no)
-// 根据 slice_no 和 port_no (0~31) 返回文件路径
+std::string Patient::path_of_pcapfile_from_slice(std::string slice_id, int port_no)
+// 根据 slice_id 和 port_no (0~31) 返回文件路径
 {
-    if (slice_no > slice_sum)
+    std::string path = data_path + id + "_" + name + "/" + slice_id;
+    if (access(path.c_str(), 0) != 0)
     {
-        std::cout << "ERROR :: Current slice not exsited." << std::endl;
-        return NULL;
+        std::cout << "ERROR :: Slice [" << path << "] not exsited." << std::endl;
+        path = "error file";
+        return path;
     }
 
-    std::string path = data_path + id + "_" + name + "/" + std::to_string(slice_no) + "/DatPort" + std::to_string(port_no) + ".pcap";
+    path = data_path + id + "_" + name + "/" + slice_id + "/DatPort" + std::to_string(port_no) + ".pcap";
     return path;
 }
 

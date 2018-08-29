@@ -21,44 +21,25 @@ int main(int argc, char const *argv[])
 {
     auto start_time_main = std::chrono::high_resolution_clock::now();
     std::string cfg_file, id, name;
-    int slice_index;
+    std::string slice_index;
 
     switch (argc)
     {
-    case 1:
-        cfg_file = "config.ini";
-        id = "1";
-        name = "TEST";
-        slice_index = 1;
-        break;
-    case 2:
-        cfg_file = argv[1];
-        id = "1";
-        name = "TEST";
-        slice_index = 1;
-        break;
-    case 4:
-        cfg_file = argv[1];
-        id = argv[2];
-        name = argv[3];
-        slice_index = 1;
-        break;
     case 5:
         cfg_file = argv[1];
         id = argv[2];
         name = argv[3];
-        slice_index = atoi(argv[4]);
+        slice_index = argv[4];
         break;
     default:
         std::cout << "Args are not correct, such as:" << std::endl
                   << "[Config file]" << std::endl
-                  << "[config file] [ID] [Name]" << std::endl;
+                  << "[config file] [ID] [Name] [Slice ID]" << std::endl;
         return -1;
         break;
     }
 
     Config config(cfg_file);
-
     Patient *pptr = new Patient(config.storage_path, id, name);
     DataProcess *ptr = new DataProcess(config, *pptr);
 

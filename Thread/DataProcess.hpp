@@ -41,7 +41,7 @@ class DataProcess
     int end_file_index;
     bool flag_raw_data_ready;
     bool flag_decode_data_ready;
-    int cur_index_id;
+    std::string cur_index_id;
 
     /* function */
     inline unsigned int read_as_int(char *ptr);
@@ -60,7 +60,7 @@ class DataProcess
     /* function */
     DataProcess(Config in_config, Patient in_patient);
     ~DataProcess();
-    int load_slice(int index);
+    int load_slice(std::string index);
     int check_index_data();
     int decode_slice();
     int map_raw_2_decode();
@@ -84,16 +84,11 @@ DataProcess::~DataProcess()
     free(index_data);
 }
 
-int DataProcess::load_slice(int index)
+int DataProcess::load_slice(std::string index)
 // 获得读取文件的范围 start_file_index 和 end_file_index
 // 利用多线程把文件加载进入内存 *raw_data 和 *index_data
 // 返回值 1 加载成功 其它：加载失败。
 {
-    if (index > patient.slice_sum)
-    {
-        return -1;
-    }
-
     cur_index_id = index;
     std::string filepath;
     raw_data_length = (end_file_index - start_file_index + 1) * (long long)PACKET_SUM_PER_INTERFACE * VALID_BYTES_LENGTH_PER_PACKAGE;
@@ -113,6 +108,11 @@ int DataProcess::load_slice(int index)
     for (int i = start_file_index; i <= end_file_index; i++)
     {
         filepath = patient.path_of_pcapfile_from_slice(index, i);
+        
+        if (filepath == "error file") {
+            exit(-1);
+        }
+
         // std::cout << filepath << std::endl;
         boost::asio::post(threadpool, boost::bind(&DataProcess::read_pcap_2_memory, this, filepath, &raw_data[(i - start_file_index) * (long long)PACKET_SUM_PER_INTERFACE * VALID_BYTES_LENGTH_PER_PACKAGE], &index_data[(i - start_file_index) * (long long)PACKET_SUM_PER_INTERFACE * FLAG_BITS_PER_PACKAGE]));
     }
@@ -345,7 +345,7 @@ int DataProcess::save_decode_data()
 
     int board_sum = (end_file_index - start_file_index + 1) / 4;
 
-    std::string save_file = config.storage_path + patient.id + "_" + patient.name + "/" + std::to_string(cur_index_id) + "/decode_data";
+    std::string save_file = config.storage_path + patient.id + "_" + patient.name + "/" + cur_index_id + "/decode_data";
 
     for (int table_index = 0; table_index < 2048; table_index++)
     {
