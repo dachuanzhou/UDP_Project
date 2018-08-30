@@ -4,3 +4,4 @@ debug/*_cpp
 debug/*.dSYM/
 release/*_cpp
 release/*_c
+Document/

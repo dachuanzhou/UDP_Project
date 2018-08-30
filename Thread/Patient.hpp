@@ -22,11 +22,11 @@
 
 class Patient
 {
-private:
+  private:
     int creat_template(std::string storage_path, std::string id, std::string name);
     int load_info(std::string storage_path, std::string id, std::string name);
-    
-public:
+
+  public:
     // 个人信息的种类
     std::string name;
     int age;
@@ -61,7 +61,8 @@ Patient::Patient(std::string storage_path, std::string id, std::string name)
 {
     this->name = name;
     this->id = id;
-    if (load_info(storage_path.c_str(), id, name) != 0) {
+    if (load_info(storage_path.c_str(), id, name) != 0)
+    {
         creat_template(storage_path.c_str(), id, name);
         exit(-1);
     }
@@ -89,7 +90,13 @@ int Patient::creat_template(std::string storage_path, std::string id, std::strin
 int Patient::load_info(std::string storage_path, std::string id, std::string name)
 // 根据 ID 和 Name 读取病人基本信息
 {
-    std::string path = storage_path + id + "_" + name + "/patient.txt";
+    std::string path = storage_path + id + "_" + name;
+    if (access(path.c_str(), 0) != 0)
+    {
+        std::cout << "ERROR :: no folder exsits, check the data folder -> " << path << std::endl;
+        exit(-1);
+    }
+    path = path + "/patient.txt";
     if (access(path.c_str(), 0) != 0)
     {
         std::cout << "ERROR :: no patient info exsits." << std::endl;
@@ -111,6 +118,7 @@ int Patient::load_info(std::string storage_path, std::string id, std::string nam
 
 void Patient::print_info()
 {
+    std::cout << "⌜---------- Patient Info Done. ----------⌝" << std::endl;
     std::cout << "Name = " << name << std::endl;
     std::cout << "Age = " << age << std::endl;
     std::cout << "ID = " << id << std::endl;
@@ -120,7 +128,7 @@ void Patient::print_info()
     std::cout << "Comment = " << comment << std::endl;
     std::cout << "Data_Path = " << data_path << std::endl;
     std::cout << "Slice_Sum = " << slice_sum << std::endl;
-    std::cout << "---------- Patient Info Done. ----------" << std::endl << std::endl;
+    std::cout << "⌞---------- Patient Info Done. ----------⌟" << std::endl;
 }
 
 bool Patient::path_of_pcapfile_from_slice(std::string slice_id, std::string paths[32])

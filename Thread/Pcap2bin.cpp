@@ -22,19 +22,27 @@ int main(int argc, char const *argv[])
     auto start_time_main = std::chrono::high_resolution_clock::now();
     std::string cfg_file, id, name;
     std::string slice_index;
+    int save_type = 0;
 
     switch (argc)
     {
-    case 5:
+    case 6:
         cfg_file = argv[1];
         id = argv[2];
         name = argv[3];
         slice_index = argv[4];
+        save_type = atoi(argv[5]);
+        if (save_type != 1 && save_type != 2048 && save_type != 0)
+        {
+            std::cout << "ERROR :: the last parameter must be 0 or 1 or 2048." << std::endl;
+            std::cout << "0: no save. 1: save one bin. 2048: save 2048 bins." << std::endl;
+            exit(-1);
+        }
+
         break;
     default:
-        std::cout << "Args are not correct, such as:" << std::endl
-                  << "[Config file]" << std::endl
-                  << "[config file] [ID] [Name] [Slice ID]" << std::endl;
+        std::cout << "Args are not correct, must have 5 args:" << std::endl
+                  << "[config file] [ID] [Name] [Slice ID] [0 or 1 or 2048]" << std::endl;
         return -1;
         break;
     }
@@ -51,7 +59,7 @@ int main(int argc, char const *argv[])
     std::cout << "Slice " << slice_index << " : "
               << "pcap from " << config.raw_data_ids[0] << " to " << config.raw_data_ids[config.raw_data_ids.size() - 1] << " load successful." << std::endl;
     auto end_time = std::chrono::high_resolution_clock::now();
-    std::cout << std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time_main).count() << "ms for load pcap files." << std::endl;
+    std::cout << "INFO :: " << std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time_main).count() << "ms for load pcap files." << std::endl;
 
     auto start_time_check = std::chrono::high_resolution_clock::now();
     if (ptr->check_index_data() != 1)
@@ -60,7 +68,7 @@ int main(int argc, char const *argv[])
         return 0;
     }
     end_time = std::chrono::high_resolution_clock::now();
-    std::cout << std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time_check).count() << "ms for check package order." << std::endl;
+    std::cout << "INFO :: " << std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time_check).count() << "ms for check package order." << std::endl;
 
     auto start_time_decode = std::chrono::high_resolution_clock::now();
     if (ptr->map_raw_2_decode() != 1)
@@ -69,22 +77,38 @@ int main(int argc, char const *argv[])
         return 0;
     }
     end_time = std::chrono::high_resolution_clock::now();
-    std::cout << std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time_decode).count() << "ms for decode data." << std::endl;
+    std::cout << "INFO :: " << std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time_decode).count() << "ms for decode data." << std::endl;
 
     auto start_time_save = std::chrono::high_resolution_clock::now();
-    if (ptr->save_decode_data() != 1)
+
+    switch (save_type)
     {
-        std::cout << "ERROR :: save decode data error." << std::endl;
-        return 0;
+    case 1:
+        if (ptr->save_decode_data() != 1)
+        {
+            std::cout << "ERROR :: save decode data error." << std::endl;
+            return 0;
+        }
+        break;
+    case 2048:
+        if (ptr->save_decode_tables() != 1)
+        {
+            std::cout << "ERROR :: save decode data error." << std::endl;
+            return 0;
+        }
+        break;
+    default:
+        break;
     }
+
     end_time = std::chrono::high_resolution_clock::now();
-    std::cout << std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time_save).count() << "ms for save decode data." << std::endl;
+    std::cout << "INFO :: " << std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time_save).count() << "ms for save decode data." << std::endl;
 
     free(pptr);
     free(ptr);
 
     end_time = std::chrono::high_resolution_clock::now();
-    std::cout << std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time_main).count() << "ms" << std::endl;
+    std::cout << "INFO :: Total running " << std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time_main).count() << "ms" << std::endl;
 
     exit(0);
 }

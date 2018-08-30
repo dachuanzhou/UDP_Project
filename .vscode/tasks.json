@@ -67,7 +67,7 @@
             "args": [
                 "-std=c++11",
                 "-Wall",
-                // "-O3",
+                "-O3",
                 "\"./${relativeFile}\" -o \"${workspaceFolder}/release/${fileBasenameNoExtension}_cpp\"",
                 "-lboost_system",
                 "-lpthread",
