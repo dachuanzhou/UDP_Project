@@ -315,9 +315,9 @@ void DataProcess::process_tables(int start_table_index, int tables_per_thread, i
     for (int cur_table_index = start_table_index; cur_table_index < tables_per_thread + start_table_index; cur_table_index++)
     {
         // 使用 order_map 排序
-        cur_table_ordered_index = order_map[cur_table_index];
+        // cur_table_ordered_index = order_map[cur_table_index];
         // 不使用 order_map 排序
-        // cur_table_ordered_index = cur_table_index;
+        cur_table_ordered_index = cur_table_index;
         for (int double_column_index = 0; double_column_index < 1875; double_column_index++)
         {
 
@@ -350,6 +350,7 @@ void DataProcess::process_tables(int start_table_index, int tables_per_thread, i
 int DataProcess::map_raw_2_decode()
 {
     int board_sum;
+    int cur_start_table_index = 0;
     board_sum = (end_file_index - start_file_index + 1) / 4;
 
     decode_data_length = (end_file_index - start_file_index + 1) * (long long)PACKET_SUM_PER_INTERFACE * 1600 / 2;
@@ -367,13 +368,16 @@ int DataProcess::map_raw_2_decode()
     for (int thread_index = 0; thread_index < config.program_decode_pcap_threads_sum; thread_index++)
     {
         // process_tables(thread_index * tables_per_thread, tables_per_thread, board_sum);
-        boost::asio::post(threadpool, boost::bind(&DataProcess::process_tables, this, thread_index * tables_per_thread, tables_per_thread, board_sum));
-    }
-
-    if (rest_tables != 0)
-    {
-        // process_tables(tables_per_thread * config.program_decode_pcap_threads_sum, rest_tables, board_sum);
-        boost::asio::post(threadpool, boost::bind(&DataProcess::process_tables, this, tables_per_thread * config.program_decode_pcap_threads_sum, rest_tables, board_sum));
+        
+        if (thread_index < rest_tables) {
+            boost::asio::post(threadpool, boost::bind(&DataProcess::process_tables, this, cur_start_table_index, tables_per_thread + 1, board_sum));
+            cur_start_table_index += tables_per_thread + 1;
+        }
+        else
+        {
+            boost::asio::post(threadpool, boost::bind(&DataProcess::process_tables, this, cur_start_table_index, tables_per_thread, board_sum));
+            cur_start_table_index += tables_per_thread;
+        }
     }
 
     // 用线程池的时候要 join()
