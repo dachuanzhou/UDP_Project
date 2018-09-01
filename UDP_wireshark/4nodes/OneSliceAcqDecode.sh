@@ -44,12 +44,12 @@ sleep 8
 
 # 开始解码
 echo "开始解码"
-$HOME/Program/Pcap2Bin/Pcap2Bin $HOME/Program/Pcap2Bin/config.ini $var_datetime $1 $2 1 &
-ssh uct2 "$HOME/Program/Pcap2Bin/Pcap2Bin $HOME/Program/Pcap2Bin/config.ini $var_datetime $1 $2 1" &
-ssh uct3 "$HOME/Program/Pcap2Bin/Pcap2Bin $HOME/Program/Pcap2Bin/config.ini $var_datetime $1 $2 1" &
-ssh uct4 "$HOME/Program/Pcap2Bin/Pcap2Bin $HOME/Program/Pcap2Bin/config.ini $var_datetime $1 $2 1" &
+$HOME/Program/Pcap2Bin/Pcap2Bin_cpp $HOME/Program/Pcap2Bin/config.ini $var_datetime $1 $2 1 &
+ssh uct2 "$HOME/Program/Pcap2Bin/Pcap2Bin_cpp $HOME/Program/Pcap2Bin/config.ini $var_datetime $1 $2 1" &
+ssh uct3 "$HOME/Program/Pcap2Bin/Pcap2Bin_cpp $HOME/Program/Pcap2Bin/config.ini $var_datetime $1 $2 1" &
+ssh uct4 "$HOME/Program/Pcap2Bin/Pcap2Bin_cpp $HOME/Program/Pcap2Bin/config.ini $var_datetime $1 $2 1" &
 # ./UDPCatchDecode.sh $subject_var
 # | grep workDir | awk -F'[:]' '{print $2}'`
-sleep 8
+sleep 11
 echo "data acq!"
 echo $(date +"%H:%M:%S.%N")
