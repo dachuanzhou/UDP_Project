@@ -47,10 +47,12 @@ int main(int argc, char const *argv[])
         break;
     }
 
+    // 初始化相关参数
     Config config(cfg_file);
     Patient *pptr = new Patient(config.storage_path, id, name);
     DataProcess *ptr = new DataProcess(config, *pptr);
 
+    // 读取 Pcap 文件
     if (ptr->load_slice(slice_index) != 1)
     {
         std::cout << "ERROR :: Slice " << slice_index << " : "
@@ -61,6 +63,7 @@ int main(int argc, char const *argv[])
     auto end_time = std::chrono::high_resolution_clock::now();
     std::cout << "INFO :: " << std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time_main).count() << "ms for load pcap files." << std::endl;
 
+    // 检查 Pcap 文件中包的顺序
     auto start_time_check = std::chrono::high_resolution_clock::now();
     if (ptr->check_index_data() != 1)
     {
@@ -70,6 +73,19 @@ int main(int argc, char const *argv[])
     end_time = std::chrono::high_resolution_clock::now();
     std::cout << "INFO :: " << std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time_check).count() << "ms for check package order." << std::endl;
 
+    // for debug
+    
+    // for(int i = 0; i < 157; i++)
+    // {
+    //     printf("%04d ::", (int)56 * i);
+    //     for (int j = 0; j < 56; j++)
+    //     {
+    //         printf(" %02x", (unsigned char)ptr->raw_data[i * 56 + j]);
+    //     }
+    //     printf("\n");
+    // }
+
+    // 解码
     auto start_time_decode = std::chrono::high_resolution_clock::now();
     if (ptr->map_raw_2_decode() != 1)
     {
@@ -81,6 +97,7 @@ int main(int argc, char const *argv[])
 
     auto start_time_save = std::chrono::high_resolution_clock::now();
 
+    // 保存解码后的文件
     switch (save_type)
     {
     case 1:
@@ -104,6 +121,7 @@ int main(int argc, char const *argv[])
     end_time = std::chrono::high_resolution_clock::now();
     std::cout << "INFO :: " << std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time_save).count() << "ms for save decode data." << std::endl;
 
+    // 释放指针
     free(pptr);
     free(ptr);
 

@@ -4,11 +4,13 @@
     "version": "2.0.0",
     "osx": {
         "args": [
+            "-lboost_atomic-mt",
             "-lboost_thread-mt",
         ]
     },
     "linux": {
         "args": [
+            "-lboost_atomic",
             "-lboost_thread",
         ]
     },
@@ -18,7 +20,7 @@
         "focus": false,
         "panel": "shared"
     },
-    "problemMatcher":"$gcc",
+    "problemMatcher": "$gcc",
     "tasks": [
         {
             "label": "GCC Debug",

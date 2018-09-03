@@ -48,7 +48,7 @@ class DataProcess
     inline unsigned int read_as_int(char *ptr);
     int read_pcap_2_memory(std::string filepath, char *packets_raw, char *index_raw);
     void check_udp_packets_order(std::string filepath);
-    inline void convert_14bits_to_16bits(char *buffer, long long raw_data_index, long long decode_data_index);
+    inline void convert_14bits_to_16bits(unsigned char *buffer, long long raw_data_index, long long decode_data_index);
     void process_tables(int start_table_index, int tables_per_thread, int board_sum);
 
   public:
@@ -228,13 +228,13 @@ int DataProcess::read_pcap_2_memory(std::string filepath, char *packets_raw, cha
     }
 }
 
-inline void DataProcess::convert_14bits_to_16bits(char *buffer, long long raw_data_index, long long decode_data_index)
+inline void DataProcess::convert_14bits_to_16bits(unsigned char *buffer, long long raw_data_index, long long decode_data_index)
 // 从 pointer_7 读取 7 个字节（4个 samples，转换为 4个 int16_t （16bits）
 // 循环8次，转换32个 samples，正好对应32个通道的 samples
 // 调用一次转换 56 bytes
 {
-    char *ptr;
-    char *pointer_7 = &raw_data[raw_data_index];
+    unsigned char *ptr;
+    unsigned char *pointer_7 = (unsigned char *)&raw_data[raw_data_index];
     int16_t *pointer_16 = &decode_data[decode_data_index];
 
     buffer[0] = pointer_7[5];
@@ -298,10 +298,10 @@ inline void DataProcess::convert_14bits_to_16bits(char *buffer, long long raw_da
     for (int i = 0; i < 8; i++)
     {
         ptr = &buffer[i * 7];
-        pointer_16[i * 4 + 3] = (ptr[0] << 8 | (ptr[1] & 0xfc)) / 4;
-        pointer_16[i * 4 + 2] = ((ptr[1] & 0x3) << 14 | (ptr[2] << 6) | (ptr[3] >> 2 & 0xfc)) / 4;
-        pointer_16[i * 4 + 1] = ((ptr[3] & 0xf) << 12 | ptr[4] << 4 | (ptr[5] >> 4 & 0xc)) / 4;
-        pointer_16[i * 4] = ((ptr[5] & 0x3f) << 10 | ptr[6] << 2) / 4;
+        pointer_16[i * 4] = (int16_t)(((ptr[5] << 10) | (ptr[6] << 2)) & 0xfffc) / 4;
+        pointer_16[i * 4 + 1] = (int16_t)(((ptr[3] << 12) | (ptr[4] << 4) | (ptr[5] >> 4)) & 0xfffc) / 4;
+        pointer_16[i * 4 + 2] = (int16_t)(((ptr[1] << 14) | (ptr[2] << 6) | (ptr[3] >> 2)) & 0xfffc) / 4;
+        pointer_16[i * 4 + 3] = (int16_t)(((ptr[0] << 8) | (ptr[1])) & 0xfffc) / 4;
     }
 
     return;
@@ -309,37 +309,37 @@ inline void DataProcess::convert_14bits_to_16bits(char *buffer, long long raw_da
 
 void DataProcess::process_tables(int start_table_index, int tables_per_thread, int board_sum)
 {
-    char *buffer;
-    buffer = (char *)std::calloc(56, 1);
+    unsigned char *buffer;
+    buffer = (unsigned char *)std::calloc(56, 1);
     int cur_table_ordered_index;
     for (int cur_table_index = start_table_index; cur_table_index < tables_per_thread + start_table_index; cur_table_index++)
     {
         // 使用 order_map 排序
-        // cur_table_ordered_index = order_map[cur_table_index];
+        cur_table_ordered_index = order_map[cur_table_index];
         // 不使用 order_map 排序
-        cur_table_ordered_index = cur_table_index;
+        // cur_table_ordered_index = cur_table_index;
         for (int double_column_index = 0; double_column_index < 1875; double_column_index++)
         {
 
             for (int board_id = 0; board_id < board_sum; board_id++)
             {
-                convert_14bits_to_16bits(&buffer[0], (long long)860160000 * (0 + board_id * 4) + cur_table_ordered_index * (long long)420000 + double_column_index * 56, cur_table_ordered_index * board_sum * (long long)960000 + double_column_index * board_sum * (long long)512 + board_id * 256);
-                convert_14bits_to_16bits(&buffer[0], (long long)860160000 * (2 + board_id * 4) + cur_table_ordered_index * (long long)420000 + double_column_index * 56, cur_table_ordered_index * board_sum * (long long)960000 + double_column_index * board_sum * (long long)512 + board_id * 256 + 32);
-                convert_14bits_to_16bits(&buffer[0], (long long)860160000 * (0 + board_id * 4) + cur_table_ordered_index * (long long)420000 + (double_column_index + 1875) * 56, cur_table_ordered_index * board_sum * (long long)960000 + double_column_index * board_sum * (long long)512 + board_id * 256 + 64);
-                convert_14bits_to_16bits(&buffer[0], (long long)860160000 * (2 + board_id * 4) + cur_table_ordered_index * (long long)420000 + (double_column_index + 1875) * 56, cur_table_ordered_index * board_sum * (long long)960000 + double_column_index * board_sum * (long long)512 + board_id * 256 + 96);
-                convert_14bits_to_16bits(&buffer[0], (long long)860160000 * (0 + board_id * 4) + cur_table_ordered_index * (long long)420000 + (double_column_index + 3750) * 56, cur_table_ordered_index * board_sum * (long long)960000 + double_column_index * board_sum * (long long)512 + board_id * 256 + 128);
-                convert_14bits_to_16bits(&buffer[0], (long long)860160000 * (2 + board_id * 4) + cur_table_ordered_index * (long long)420000 + (double_column_index + 3750) * 56, cur_table_ordered_index * board_sum * (long long)960000 + double_column_index * board_sum * (long long)512 + board_id * 256 + 160);
-                convert_14bits_to_16bits(&buffer[0], (long long)860160000 * (0 + board_id * 4) + cur_table_ordered_index * (long long)420000 + (double_column_index + 5625) * 56, cur_table_ordered_index * board_sum * (long long)960000 + double_column_index * board_sum * (long long)512 + board_id * 256 + 192);
-                convert_14bits_to_16bits(&buffer[0], (long long)860160000 * (2 + board_id * 4) + cur_table_ordered_index * (long long)420000 + (double_column_index + 5625) * 56, cur_table_ordered_index * board_sum * (long long)960000 + double_column_index * board_sum * (long long)512 + board_id * 256 + 224);
+                convert_14bits_to_16bits(&buffer[0], (long long)860160000 * (0 + board_id * 4) + cur_table_index * (long long)420000 + double_column_index * 56, cur_table_ordered_index * board_sum * (long long)960000 + double_column_index * board_sum * (long long)512 + board_id * 256);
+                convert_14bits_to_16bits(&buffer[0], (long long)860160000 * (2 + board_id * 4) + cur_table_index * (long long)420000 + double_column_index * 56, cur_table_ordered_index * board_sum * (long long)960000 + double_column_index * board_sum * (long long)512 + board_id * 256 + 32);
+                convert_14bits_to_16bits(&buffer[0], (long long)860160000 * (0 + board_id * 4) + cur_table_index * (long long)420000 + (double_column_index + 1875) * 56, cur_table_ordered_index * board_sum * (long long)960000 + double_column_index * board_sum * (long long)512 + board_id * 256 + 64);
+                convert_14bits_to_16bits(&buffer[0], (long long)860160000 * (2 + board_id * 4) + cur_table_index * (long long)420000 + (double_column_index + 1875) * 56, cur_table_ordered_index * board_sum * (long long)960000 + double_column_index * board_sum * (long long)512 + board_id * 256 + 96);
+                convert_14bits_to_16bits(&buffer[0], (long long)860160000 * (0 + board_id * 4) + cur_table_index * (long long)420000 + (double_column_index + 3750) * 56, cur_table_ordered_index * board_sum * (long long)960000 + double_column_index * board_sum * (long long)512 + board_id * 256 + 128);
+                convert_14bits_to_16bits(&buffer[0], (long long)860160000 * (2 + board_id * 4) + cur_table_index * (long long)420000 + (double_column_index + 3750) * 56, cur_table_ordered_index * board_sum * (long long)960000 + double_column_index * board_sum * (long long)512 + board_id * 256 + 160);
+                convert_14bits_to_16bits(&buffer[0], (long long)860160000 * (0 + board_id * 4) + cur_table_index * (long long)420000 + (double_column_index + 5625) * 56, cur_table_ordered_index * board_sum * (long long)960000 + double_column_index * board_sum * (long long)512 + board_id * 256 + 192);
+                convert_14bits_to_16bits(&buffer[0], (long long)860160000 * (2 + board_id * 4) + cur_table_index * (long long)420000 + (double_column_index + 5625) * 56, cur_table_ordered_index * board_sum * (long long)960000 + double_column_index * board_sum * (long long)512 + board_id * 256 + 224);
 
-                convert_14bits_to_16bits(&buffer[0], (long long)860160000 * (1 + board_id * 4) + cur_table_ordered_index * (long long)420000 + double_column_index * 56, cur_table_ordered_index * board_sum * (long long)960000 + double_column_index * board_sum * (long long)512 + board_sum * 256 + board_id * 256);
-                convert_14bits_to_16bits(&buffer[0], (long long)860160000 * (3 + board_id * 4) + cur_table_ordered_index * (long long)420000 + double_column_index * 56, cur_table_ordered_index * board_sum * (long long)960000 + double_column_index * board_sum * (long long)512 + board_sum * 256 + board_id * 256 + 32);
-                convert_14bits_to_16bits(&buffer[0], (long long)860160000 * (1 + board_id * 4) + cur_table_ordered_index * (long long)420000 + (double_column_index + 1875) * 56, cur_table_ordered_index * board_sum * (long long)960000 + double_column_index * board_sum * (long long)512 + board_sum * 256 + board_id * 256 + 64);
-                convert_14bits_to_16bits(&buffer[0], (long long)860160000 * (3 + board_id * 4) + cur_table_ordered_index * (long long)420000 + (double_column_index + 1875) * 56, cur_table_ordered_index * board_sum * (long long)960000 + double_column_index * board_sum * (long long)512 + board_sum * 256 + board_id * 256 + 96);
-                convert_14bits_to_16bits(&buffer[0], (long long)860160000 * (1 + board_id * 4) + cur_table_ordered_index * (long long)420000 + (double_column_index + 3750) * 56, cur_table_ordered_index * board_sum * (long long)960000 + double_column_index * board_sum * (long long)512 + board_sum * 256 + board_id * 256 + 128);
-                convert_14bits_to_16bits(&buffer[0], (long long)860160000 * (3 + board_id * 4) + cur_table_ordered_index * (long long)420000 + (double_column_index + 3750) * 56, cur_table_ordered_index * board_sum * (long long)960000 + double_column_index * board_sum * (long long)512 + board_sum * 256 + board_id * 256 + 160);
-                convert_14bits_to_16bits(&buffer[0], (long long)860160000 * (1 + board_id * 4) + cur_table_ordered_index * (long long)420000 + (double_column_index + 5625) * 56, cur_table_ordered_index * board_sum * (long long)960000 + double_column_index * board_sum * (long long)512 + board_sum * 256 + board_id * 256 + 192);
-                convert_14bits_to_16bits(&buffer[0], (long long)860160000 * (3 + board_id * 4) + cur_table_ordered_index * (long long)420000 + (double_column_index + 5625) * 56, cur_table_ordered_index * board_sum * (long long)960000 + double_column_index * board_sum * (long long)512 + board_sum * 256 + board_id * 256 + 224);
+                convert_14bits_to_16bits(&buffer[0], (long long)860160000 * (1 + board_id * 4) + cur_table_index * (long long)420000 + double_column_index * 56, cur_table_ordered_index * board_sum * (long long)960000 + double_column_index * board_sum * (long long)512 + board_sum * 256 + board_id * 256);
+                convert_14bits_to_16bits(&buffer[0], (long long)860160000 * (3 + board_id * 4) + cur_table_index * (long long)420000 + double_column_index * 56, cur_table_ordered_index * board_sum * (long long)960000 + double_column_index * board_sum * (long long)512 + board_sum * 256 + board_id * 256 + 32);
+                convert_14bits_to_16bits(&buffer[0], (long long)860160000 * (1 + board_id * 4) + cur_table_index * (long long)420000 + (double_column_index + 1875) * 56, cur_table_ordered_index * board_sum * (long long)960000 + double_column_index * board_sum * (long long)512 + board_sum * 256 + board_id * 256 + 64);
+                convert_14bits_to_16bits(&buffer[0], (long long)860160000 * (3 + board_id * 4) + cur_table_index * (long long)420000 + (double_column_index + 1875) * 56, cur_table_ordered_index * board_sum * (long long)960000 + double_column_index * board_sum * (long long)512 + board_sum * 256 + board_id * 256 + 96);
+                convert_14bits_to_16bits(&buffer[0], (long long)860160000 * (1 + board_id * 4) + cur_table_index * (long long)420000 + (double_column_index + 3750) * 56, cur_table_ordered_index * board_sum * (long long)960000 + double_column_index * board_sum * (long long)512 + board_sum * 256 + board_id * 256 + 128);
+                convert_14bits_to_16bits(&buffer[0], (long long)860160000 * (3 + board_id * 4) + cur_table_index * (long long)420000 + (double_column_index + 3750) * 56, cur_table_ordered_index * board_sum * (long long)960000 + double_column_index * board_sum * (long long)512 + board_sum * 256 + board_id * 256 + 160);
+                convert_14bits_to_16bits(&buffer[0], (long long)860160000 * (1 + board_id * 4) + cur_table_index * (long long)420000 + (double_column_index + 5625) * 56, cur_table_ordered_index * board_sum * (long long)960000 + double_column_index * board_sum * (long long)512 + board_sum * 256 + board_id * 256 + 192);
+                convert_14bits_to_16bits(&buffer[0], (long long)860160000 * (3 + board_id * 4) + cur_table_index * (long long)420000 + (double_column_index + 5625) * 56, cur_table_ordered_index * board_sum * (long long)960000 + double_column_index * board_sum * (long long)512 + board_sum * 256 + board_id * 256 + 224);
             }
         }
     }
@@ -368,8 +368,9 @@ int DataProcess::map_raw_2_decode()
     for (int thread_index = 0; thread_index < config.program_decode_pcap_threads_sum; thread_index++)
     {
         // process_tables(thread_index * tables_per_thread, tables_per_thread, board_sum);
-        
-        if (thread_index < rest_tables) {
+
+        if (thread_index < rest_tables)
+        {
             boost::asio::post(threadpool, boost::bind(&DataProcess::process_tables, this, cur_start_table_index, tables_per_thread + 1, board_sum));
             cur_start_table_index += tables_per_thread + 1;
         }
@@ -403,19 +404,11 @@ int DataProcess::save_decode_data()
     int board_sum = (end_file_index - start_file_index + 1) / 4;
     std::string save_file = config.storage_path + patient.id + "_" + patient.name + "/" + cur_index_id + "/decode_data.bin";
 
-    std::ofstream f_stream(save_file, std::fstream::out);
+    std::ofstream f_stream(save_file, std::fstream::out|std::fstream::binary);
     if (f_stream)
     {
         f_stream.write((char *)&decode_data[0], (long)3932160000 * board_sum);
-
-        if (f_stream.good())
-        {
-            f_stream.close();
-        }
-        else
-        {
-            return 0;
-        }
+        f_stream.close();
     }
     return 1;
 }
