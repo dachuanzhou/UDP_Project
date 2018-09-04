@@ -64,7 +64,7 @@ Patient::Patient(std::string storage_path, std::string id, std::string name)
     if (load_info(storage_path.c_str(), id, name) != 0)
     {
         creat_template(storage_path.c_str(), id, name);
-        exit(-1);
+        // exit(-1);
     }
 }
 

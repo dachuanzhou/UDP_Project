@@ -302,6 +302,7 @@ inline void DataProcess::convert_14bits_to_16bits(unsigned char *buffer, long lo
         pointer_16[i * 4 + 1] = (int16_t)(((ptr[3] << 12) | (ptr[4] << 4) | (ptr[5] >> 4)) & 0xfffc) / 4;
         pointer_16[i * 4 + 2] = (int16_t)(((ptr[1] << 14) | (ptr[2] << 6) | (ptr[3] >> 2)) & 0xfffc) / 4;
         pointer_16[i * 4 + 3] = (int16_t)(((ptr[0] << 8) | (ptr[1])) & 0xfffc) / 4;
+
     }
 
     return;

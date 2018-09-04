@@ -18,7 +18,7 @@ fi
 killall MATLAB
 echo -en '\x52\x53' > /dev/ttyUSB0
 # sleep 1
-var_datetime=$(date +"%Y%m%d")
+var_datetime=$(date +"%Y%m%d-%H%M%S")
 var_datadir=$HOME/PatientArchive/
 var_datadir=$var_datadir$var_datetime\_$1/$2
 
@@ -45,9 +45,9 @@ sleep 8
 # 开始解码
 echo "开始解码"
 $HOME/Program/Pcap2Bin/Pcap2Bin_cpp $HOME/Program/Pcap2Bin/config.ini $var_datetime $1 $2 1 &
-ssh uct2 "$HOME/Program/Pcap2Bin/Pcap2Bin_cpp $HOME/Program/Pcap2Bin/config.ini $var_datetime $1 $2 1" &
-ssh uct3 "$HOME/Program/Pcap2Bin/Pcap2Bin_cpp $HOME/Program/Pcap2Bin/config.ini $var_datetime $1 $2 1" &
-ssh uct4 "$HOME/Program/Pcap2Bin/Pcap2Bin_cpp $HOME/Program/Pcap2Bin/config.ini $var_datetime $1 $2 1" &
+ssh uct2 "~/Program/Pcap2Bin/Pcap2Bin_cpp ~/Program/Pcap2Bin/config.ini $var_datetime $1 $2 1" &
+ssh uct3 "~/Program/Pcap2Bin/Pcap2Bin_cpp ~/Program/Pcap2Bin/config.ini $var_datetime $1 $2 1" &
+ssh uct4 "~/Program/Pcap2Bin/Pcap2Bin_cpp ~/Program/Pcap2Bin/config.ini $var_datetime $1 $2 1" &
 # ./UDPCatchDecode.sh $subject_var
 # | grep workDir | awk -F'[:]' '{print $2}'`
 sleep 11

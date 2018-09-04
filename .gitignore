@@ -5,3 +5,4 @@ debug/*.dSYM/
 release/*_cpp
 release/*_c
 Document/
+test*

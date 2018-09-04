@@ -12,6 +12,7 @@
         "args": [
             "-lboost_atomic",
             "-lboost_thread",
+            "-I/usr/local/include/opencv"
         ]
     },
     "presentation": {
@@ -30,9 +31,9 @@
             "args": [
                 "-std=c++11",
                 "-g",
-                "\"./${relativeFile}\" -o \"${workspaceFolder}/debug/${fileBasenameNoExtension}_c\"",
                 "-lboost_system",
                 "-lpthread",
+                "\"./${relativeFile}\" -o \"${workspaceFolder}/debug/${fileBasenameNoExtension}_c\"",
             ],
         },
         {
@@ -44,9 +45,9 @@
                 "-std=c++11",
                 "-g",
                 "-Wall",
-                "\"./${relativeFile}\" -o \"${workspaceFolder}/debug/${fileBasenameNoExtension}_cpp\"",
                 "-lboost_system",
                 "-lpthread",
+                "\"./${relativeFile}\" -o \"${workspaceFolder}/debug/${fileBasenameNoExtension}_cpp\"",
             ],
         },
         {
@@ -56,9 +57,9 @@
             "command": "g++",
             "args": [
                 "-std=c++11",
-                "\"./${relativeFile}\" -o \"${workspaceFolder}/release/${fileBasenameNoExtension}_c\"",
                 "-lboost_system",
                 "-lpthread",
+                "\"./${relativeFile}\" -o \"${workspaceFolder}/release/${fileBasenameNoExtension}_c\"",
             ],
         },
         {
@@ -67,12 +68,13 @@
             "group": "build",
             "command": "clang++",
             "args": [
+                "-I/usr/local/include/opencv",
                 "-std=c++11",
                 "-Wall",
                 "-O3",
-                "\"./${relativeFile}\" -o \"${workspaceFolder}/release/${fileBasenameNoExtension}_cpp\"",
                 "-lboost_system",
                 "-lpthread",
+                "\"./${relativeFile}\" -o \"${workspaceFolder}/release/${fileBasenameNoExtension}_cpp\"",
             ],
             // mac 上 lboost_thread 要改成 -lboost_thread-mt
         }
