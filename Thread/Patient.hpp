@@ -73,9 +73,9 @@ int Patient::creat_template(std::string storage_path, std::string id, std::strin
 {
     std::string path = storage_path + id + "_" + name + "/patient.txt";
     boost::property_tree::ptree ptree;
-    ptree.add("Name", "NULL");
+    ptree.add("Name", name);
     ptree.add("Age", 0);
-    ptree.add("ID", "NULL");
+    ptree.add("ID", id);
     ptree.add("Gender", "NULL");
     ptree.add("Phone", "NULL");
     ptree.add("Check_Date", "NULL");
