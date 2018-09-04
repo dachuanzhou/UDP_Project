@@ -29,10 +29,10 @@ if [ -x "$var_datadir" ]; then
 fi
 
 echo $var_datadir
-./UDPCatch.sh $1 $2 &
-ssh uct2 "~/Program/Capture/UDPCatch.sh $1 $2" &
-ssh uct3 "~/Program/Capture/UDPCatch.sh $1 $2" &
-ssh uct4 "~/Program/Capture/UDPCatch.sh $1 $2" &
+./UDPCatch.sh $var_datetime $1 $2 &
+ssh uct2 "~/Program/Capture/UDPCatch.sh $var_datetime $1 $2" &
+ssh uct3 "~/Program/Capture/UDPCatch.sh $var_datetime $1 $2" &
+ssh uct4 "~/Program/Capture/UDPCatch.sh $var_datetime $1 $2" &
 
 sleep 4
 echo "开始发送数据"

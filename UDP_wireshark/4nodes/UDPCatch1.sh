@@ -26,9 +26,8 @@ pause() {
 
 killall tshark
 
-var_datetime=$(date +"%Y%m%d")
 var_datadir=$HOME/PatientArchive/
-var_datadir=$var_datadir$var_datetime\_$1/$2
+var_datadir=$var_datadir$1\_$2/$3
 
 mkdir $var_datadir -p
 cd $var_datadir

@@ -83,7 +83,8 @@ int Patient::creat_template(std::string storage_path, std::string id, std::strin
     ptree.add("Data_Path", storage_path);
     ptree.add("Slice_Sum", 60);
     boost::property_tree::ini_parser::write_ini(path.c_str(), ptree);
-    std::cout << "Patient info file: [" << path << "]: has been created, please modify it.";
+    std::cout << "Patient info file: [" << path << "]: has been created, please modify it." << std::endl;
+    load_info(storage_path.c_str(), id, name);
     return 0;
 }
 
