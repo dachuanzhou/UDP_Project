@@ -50,6 +50,7 @@ class DataProcess
     void check_udp_packets_order(std::string filepath);
     inline void convert_14bits_to_16bits(unsigned char *buffer, long long raw_data_index, long long decode_data_index);
     void process_tables(int start_table_index, int tables_per_thread, int board_sum);
+    inline std::string get_data_part();
 
   public:
     /* data */
@@ -302,7 +303,6 @@ inline void DataProcess::convert_14bits_to_16bits(unsigned char *buffer, long lo
         pointer_16[i * 4 + 1] = (int16_t)(((ptr[3] << 12) | (ptr[4] << 4) | (ptr[5] >> 4)) & 0xfffc) / 4;
         pointer_16[i * 4 + 2] = (int16_t)(((ptr[1] << 14) | (ptr[2] << 6) | (ptr[3] >> 2)) & 0xfffc) / 4;
         pointer_16[i * 4 + 3] = (int16_t)(((ptr[0] << 8) | (ptr[1])) & 0xfffc) / 4;
-
     }
 
     return;
@@ -393,6 +393,23 @@ int DataProcess::map_raw_2_decode()
     return 1;
 }
 
+inline std::string DataProcess::get_data_part()
+{
+    switch (config.node_id)
+    {
+    case 1:
+        return "A";
+    case 2:
+        return "B";
+    case 3:
+        return "C";
+    case 4:
+        return "D";
+    default:
+        return "";
+    }
+}
+
 int DataProcess::save_decode_data()
 // 将转码结果保存为一个 bin
 {
@@ -402,10 +419,11 @@ int DataProcess::save_decode_data()
         return 0;
     }
 
+    
     int board_sum = (end_file_index - start_file_index + 1) / 4;
-    std::string save_file = config.storage_path + patient.id + "_" + patient.name + "/" + cur_index_id + "/decode_data.bin";
+    std::string save_file = config.storage_path + patient.id + "_" + patient.name + "/" + cur_index_id + "/decode_data" + get_data_part() + ".bin";
 
-    std::ofstream f_stream(save_file, std::fstream::out|std::fstream::binary);
+    std::ofstream f_stream(save_file, std::fstream::out | std::fstream::binary);
     if (f_stream)
     {
         f_stream.write((char *)&decode_data[0], (long)3932160000 * board_sum);
@@ -427,7 +445,7 @@ int DataProcess::save_decode_tables()
 
     int board_sum = (end_file_index - start_file_index + 1) / 4;
 
-    std::string save_file = config.storage_path + patient.id + "_" + patient.name + "/" + cur_index_id + "/decode_data";
+    std::string save_file = config.storage_path + patient.id + "_" + patient.name + "/" + cur_index_id + "/decode_data" + get_data_part();
 
     for (int table_index = 0; table_index < 2048; table_index++)
     {

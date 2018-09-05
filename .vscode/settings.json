@@ -81,7 +81,8 @@
         "semaphore.h": "c",
         "__hash_table": "cpp",
         "queue": "cpp",
-        "stack": "cpp"
+        "stack": "cpp",
+        "random": "cpp"
     },
     "cSpell.enabled": false
 }

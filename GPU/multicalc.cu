@@ -2,9 +2,10 @@
 #include <fstream>
 #include <string>
 #include <sstream>
-#include <math.h>
+// #include <math.h>
 #include <time.h>
 #include <cstring>
+#include <random>
 
 #include "cuda_runtime.h"
 #include "device_launch_parameters.h"
@@ -14,73 +15,53 @@ using namespace std;
 #define PI 3.14159265358979323846
 #define N 2048
 #define M 256 //接收阵元到发射阵元的最大距离（阵元个数），所以接收孔径为2*M+1
-#define ele_no 2048
-#define od 64
-#define Nsample 3750
+#define ELE_NO 2048
+#define OD 64
+#define NSAMPLE 3750
+
+int parallel_emit_sum = 1;
 
 //const int sample_point_num=5000;
 
-__device__ float dev_ele_position_center[ele_no];
-__device__ float dev_ele_position_height[ele_no]; //写到纹理内存里面
-float ele_position_center[ele_no] = {0};
-float ele_position_height[ele_no] = {0};
+__device__ float dev_ele_coord_x[ELE_NO];
+__device__ float dev_ele_coord_y[ELE_NO]; //写到纹理内存里面
+__device__ float dev_filter_data[OD];     //filter parameter
 
-float rfocus = 112.0 / 1000;
-float first_one = 2 * PI * (45 - 43.4695) / 360;        //第一个阵元角度
-float ele_angle = (2 * PI * 43.4695 / (256 - 1)) / 360; //阵元间隔角度
+short data_samples_in_process[NSAMPLE * ELE_NO * 2] = {0}; //写到页锁定主机内存
+float image_data[N * N] = {0};
+int image_point_count[N * N] = {0};
 
-short uct_data_board0[Nsample * ele_no * 2] = {0}; //写到页锁定主机内存
-short before_convert_data;
-//float trans_sdata[sample_point_num*ele_no]={0};
-
-float allimage_data[N * N] = {0};
-int allpoint_count[N * N] = {0};
-
-void get_ele_position();
-void write_txtfile();
-//cudaError_t calcWithCuda(int i,float *dev_sumdata,int *dev_sumpoint,float *dev_filterdata);
-
-__device__ float db[od]; //filter parameter
-//__device__ float da[31];
-float b[od];
-//float a[31];
-//int i;
-void get_code();
-cudaError_t precalcWithCuda(short *uct_data_board0, int i, float *dev_sumdata, int *dev_sumpoint, float *dev_filterdata, float *dev_imagedata, int *dev_pointcount);
-
-//short sample_data[sample_point_num][ele_no]={0};
-
-//double v[3344][256]={0};;
-//double u_test[1024]={0};
-__global__ void kernel3(float *filterdata, short *data1_1024_output)
+__global__ void kernel3(float *filterdata, short *data_in_process)
 {
     int bid = blockIdx.x;
     int tid = threadIdx.x;
     int id = blockDim.x * bid + tid;
-    short data[Nsample];
-    float fdata[Nsample];
+    short data[NSAMPLE];
+    float filter_temp_data[NSAMPLE];
 
-    if (id < ele_no)
+    if (id < ELE_NO)
     {
         //da[0]=0.0;
-        memset(fdata, 0, Nsample * sizeof(float));
-        for (int i = 0; i < Nsample; i++)
+        memset(filter_temp_data, 0, NSAMPLE * sizeof(float));
+        for (int i = 0; i < NSAMPLE; i++)
         {
-            data[i] = data1_1024_output[i * ele_no + id];
-            for (int j = 0; i >= j && j < od; j++)
+            data[i] = data_in_process[i * ELE_NO + id];
+            for (int j = 0; i >= j && j < OD; j++)
+
             {
-                //fdata[i] += (db[j]*data[i-j]-da[j]*fdata[i-j]);
-                fdata[i] += (db[j] * data[i - j]);
+                //filter_temp_data[i] += (dev_filter_data[j]*data[i-j]-da[j]*filter_temp_data[i-j]);
+                filter_temp_data[i] += (dev_filter_data[j] * data[i - j]);
             }
         }
         //da[0]=1.0;
 
-        for (int i = 0; i < Nsample; i++)
+        for (int i = 0; i < NSAMPLE; i++)
         {
-            filterdata[i * ele_no + id] = fdata[i];
+            filterdata[i * ELE_NO + id] = filter_temp_data[i];
         }
     }
 }
+
 __global__ void kernel(int i, float *image_data, int *point_count, float *trans_sdata)
 {
     int c = 1520;
@@ -97,7 +78,7 @@ __global__ void kernel(int i, float *image_data, int *point_count, float *trans_
     float d_z = image_length / (no_point - 1);
 
     int middot = -160; //发射前1us开始接收，也就是约为12.5个点之后发射,数据显示约16个点
-                       //const int ele_no=1024;
+                       //const int ELE_NO=1024;
 
     int k_line = blockIdx.y;                       //线
     int nn = blockIdx.x;                           //点
@@ -105,7 +86,7 @@ __global__ void kernel(int i, float *image_data, int *point_count, float *trans_
     int y = threadIdx.x;                           //接收阵元
     int j = i - 1 - M + y;                         //接收阵元
     int bid = blockIdx.x + blockIdx.y * gridDim.x; //线程块的索引
-    int tid = blockDim.x * bid + threadIdx.x;      //线程的索引
+    // int tid = blockDim.x * bid + threadIkdx.x;      //线程的索引
 
     __shared__ float cache_image[2 * M];
     __shared__ int cache_point[2 * M];
@@ -120,32 +101,32 @@ __global__ void kernel(int i, float *image_data, int *point_count, float *trans_
         float x = -image_length / 2 + d_x * k_line;
         float xg = 0.0014;
 
-        // for(int jj=1;jj<=ele_no/M;jj++)
+        // for(int jj=1;jj<=ELE_NO/M;jj++)
         // {
-        //  int j=y*ele_no/M+jj;
+        //  int j=y*ELE_NO/M+jj;
         for (int jj = 0; jj < 2; jj++)
         {
             i = i + jj;
             int j = i - 1 - M + y; //接收阵元
-            j = (j + ele_no) % ele_no;
+            j = (j + ELE_NO) % ELE_NO;
 
-            //int num= (sqrt(pow((dev_ele_position_center[i-1]-x),2) + pow((z1-dev_ele_position_height[i-1]),2))+sqrt(pow((dev_ele_position_center[j-1]-x),2) + pow((z1-dev_ele_position_height[j-1]),2)))/c*fs+0.5;
-            float disi = sqrt((dev_ele_position_center[i - 1] - x) * (dev_ele_position_center[i - 1] - x) + (z1 - dev_ele_position_height[i - 1]) * (z1 - dev_ele_position_height[i - 1]));
-            float disj = sqrt((dev_ele_position_center[j] - x) * (dev_ele_position_center[j] - x) + (z1 - dev_ele_position_height[j]) * (z1 - dev_ele_position_height[j]));
+            float disi = sqrtf((dev_ele_coord_x[i - 1] - x) * (dev_ele_coord_x[i - 1] - x) + (z1 - dev_ele_coord_y[i - 1]) * (z1 - dev_ele_coord_y[i - 1]));
+            float disj = sqrtf((dev_ele_coord_x[j] - x) * (dev_ele_coord_x[j] - x) + (z1 - dev_ele_coord_y[j]) * (z1 - dev_ele_coord_y[j]));
             float ilength = 112.0 / 1000;
-            float imagelength = sqrt(x * x + z1 * z1);
+            float imagelength = sqrtf(x * x + z1 * z1);
             float angle = acos((ilength * ilength + disi * disi - imagelength * imagelength) / 2 / ilength / disi);
             if ((disi >= 0.1 * 2 / 3 && (abs(i - j - 1) < 256 || abs(i - j - 1) > 2048 - 256)) || (disi >= 0.1 * 1 / 3 && (abs(i - j - 1) < 200 || abs(i - j - 1) > 2048 - 200)) || (disi >= 0 && (abs(i - j - 1) < 100 || abs(i - j - 1) > 2048 - 100)))
             {
-                int num = (disi + disj) / c * fs + 0.5;
-                //if (((num+middot)>200)&&(num<=point_length)&&(angle<PI/9))
-                // if (((num+middot+(od-1-1)/2)>100)&&((num+middot+(od-1-1)/2)<=point_length))
-                if (((num + middot + (od - 1 - 1) / 2) > 100) && ((num + middot + (od - 1 - 1) / 2) <= point_length) && (angle < PI / 9))
-                {
-                    u += trans_sdata[(num + middot + (od - 1 - 1) / 2) * ele_no + j] * exp(xg * (num - 1));
-                    point_count_1 += 1;
-                }
-            }
+             int num = (disi + disj) / c * fs + 0.5;
+
+                 if (((num + middot + (OD - 1 - 1) / 2) > 100) && ((num + middot + (OD - 1 - 1) / 2) <= point_length) && (angle < PI / 9))
+                 {
+                    u += trans_sdata[(num + middot + (OD - 1 - 1) / 2) * ELE_NO + j] * exp(xg * (num - 1));
+                    u += ((num + middot + (OD - 1 - 1) / 2) * ELE_NO + j) * exp(xg * (num - 1));
+
+                     point_count_1 += 1;
+                 }
+             }
         }
         cache_image[cacheIndex] = u;
         cache_point[cacheIndex] = point_count_1;
@@ -190,34 +171,178 @@ __global__ void add(float *sumdata, int *sumpoint, float *imagedata, int *point_
     }
 }
 
+cudaError_t precalcWithCuda(short *dev_data_samples_in_process, int ele_emit_id, float *dev_sumdata, int *dev_sumpoint, float *dev_filterdata, float *dev_imagedata, int *dev_pointcount)
+{
+    cudaError_t cudaStatus;
+
+    //kernel 1,kernel2 decode
+    //kernel3 filter
+    kernel3<<<16, 256>>>(dev_filterdata, dev_data_samples_in_process);
+    cudaStatus = cudaGetLastError();
+    if (cudaStatus != cudaSuccess)
+    {
+        cout << "Kernel3 launch failed: " << cudaGetErrorString(cudaStatus);
+        //goto Error;
+        return cudaStatus;
+    }
+
+    // cudaStatus = cudaDeviceSynchronize();
+
+    dim3 gridimage(N, N);
+    //dim3 threads(M);
+    kernel<<<gridimage, 2 * M>>>(ele_emit_id, dev_imagedata, dev_pointcount, dev_filterdata); //启动一个二维的N*N个block，每个block里面M个thread
+
+    // Check for any errors launching the kernel
+    cudaStatus = cudaGetLastError();
+    if (cudaStatus != cudaSuccess)
+    {
+        cout << "calcKernel launch failed: " << cudaGetErrorString(cudaStatus);
+        //goto Error;
+        return cudaStatus;
+    }
+    // cudaDeviceSynchronize();
+
+    //把所有的结果加到一起
+    add<<<32, 32>>>(dev_sumdata, dev_sumpoint, dev_imagedata, dev_pointcount);
+    cudaStatus = cudaGetLastError();
+    if (cudaStatus != cudaSuccess)
+    {
+        cout << "addKernel launch failed: " << cudaGetErrorString(cudaStatus);
+        //goto Error;
+        return cudaStatus;
+    }
+
+    // cudaDeviceSynchronize waits for the kernel to finish, and returns
+    // any errors encountered during the launch.
+    // cudaStatus = cudaDeviceSynchronize();
+    // if (cudaStatus != cudaSuccess)
+    // {
+    //     fprintf(stderr, "cudaDeviceSynchronize returned error code %d after launching addKernel!\n", cudaStatus);
+    //     return cudaStatus;
+    // }
+
+    return cudaStatus;
+}
+
+void get_ele_position(float *ele_coord_x, float *ele_coord_y)
+{
+    float rfocus = (float)112 / 1000;
+    float ele_angle = (2 * PI * 43.4695 / (256 - 1)) / 360; //阵元间隔角度
+    float first_one = 2 * PI * (45 - 43.4695) / 360;        //第一个阵元角度
+
+    for (int i = 0; i < 256; i++)
+    {
+        ele_coord_x[i] = rfocus * cos(first_one + i * ele_angle);
+        ele_coord_y[i] = -rfocus * sin(first_one + i * ele_angle);
+    }
+    for (int i = 256; i < 512; i++)
+    {
+        ele_coord_x[i] = rfocus * cos(first_one + (i - 256) * ele_angle + PI / 4);
+        ele_coord_y[i] = -rfocus * sin(first_one + (i - 256) * ele_angle + PI / 4);
+    }
+    for (int i = 512; i < 768; i++)
+    {
+        ele_coord_x[i] = rfocus * cos(first_one + (i - 512) * ele_angle + PI / 2);
+        ele_coord_y[i] = -rfocus * sin(first_one + (i - 512) * ele_angle + PI / 2);
+    }
+    for (int i = 768; i < 1024; i++)
+    {
+        ele_coord_x[i] = rfocus * cos(first_one + (i - 768) * ele_angle + 3 * PI / 4);
+        ele_coord_y[i] = -rfocus * sin(first_one + (i - 768) * ele_angle + 3 * PI / 4);
+    }
+    for (int i = 1024; i < 1280; i++)
+    {
+        ele_coord_x[i] = rfocus * cos(first_one + (i - 1024) * ele_angle + PI);
+        ele_coord_y[i] = -rfocus * sin(first_one + (i - 1024) * ele_angle + PI);
+    }
+    for (int i = 1280; i < 1536; i++)
+    {
+        ele_coord_x[i] = rfocus * cos(first_one + (i - 1280) * ele_angle + 5 * PI / 4);
+        ele_coord_y[i] = -rfocus * sin(first_one + (i - 1280) * ele_angle + 5 * PI / 4);
+    }
+    for (int i = 1536; i < 1792; i++)
+    {
+        ele_coord_x[i] = rfocus * cos(first_one + (i - 1536) * ele_angle + 3 * PI / 2);
+        ele_coord_y[i] = -rfocus * sin(first_one + (i - 1536) * ele_angle + 3 * PI / 2);
+    }
+    for (int i = 1792; i < 2048; i++)
+    {
+        ele_coord_x[i] = rfocus * cos(first_one + (i - 1792) * ele_angle + 7 * PI / 4);
+        ele_coord_y[i] = -rfocus * sin(first_one + (i - 1792) * ele_angle + 7 * PI / 4);
+    }
+}
+
+void write_txtfile(std::string output_path)
+{
+    ofstream outfile(output_path);
+    if (!outfile.is_open())
+    {
+        cout << " the file open fail" << endl;
+        exit(1);
+    }
+
+    for (int k = 0; k < N; k++)
+    {
+        for (int j = 0; j < N; j++)
+        {
+            if (image_point_count[k * N + j] == 0)
+                outfile << image_data[k * N + j] << " ";
+            else
+                outfile << image_data[k * N + j] / image_point_count[k * N + j] << " ";
+        }
+        outfile << "\r\n";
+    }
+
+    outfile.close();
+}
+
 int main(int argc, char const *argv[])
 {
     time_t start, over;
     start = time(NULL);
-    //float *db;
+
+    std::string filter_path = "";
+    std::string bin_path = "";
+    std::string output_path = "";
+    switch (argc)
+    {
+    case 4:
+        parallel_emit_sum = atoi(argv[1]);
+        filter_path = argv[2];
+        bin_path = argv[3];
+        output_path = "origin.txt";
+        break;
+    case 5:
+        parallel_emit_sum = atoi(argv[1]);
+        filter_path = argv[2];
+        bin_path = argv[3];
+        output_path = argv[4];
+        break;
+    default:
+        std::cout << "Please input 3 or 4 paras" << std::endl;
+        std::cout << "[parallel emit sum] [filter path] [bin path]" << std::endl;
+        std::cout << "[parallel emit sum] [filter path] [bin path] [output path]" << std::endl;
+        exit(-1);
+        break;
+    }
 
     cudaError_t cudaStatus;
 
-    ifstream inRco;
-    std::string s1 = "b_64.filter";
-    const char *filenameRco;
-    filenameRco = s1.c_str();
-    inRco.open(filenameRco, ios_base::in | ios::binary);
-    if (!inRco.is_open())
+    // Read filter data and put in GPU
+    ifstream file_read;
+    file_read.open(filter_path.c_str(), ios_base::in | ios::binary);
+    if (!file_read.is_open())
     {
-        cout << " the file b open fail" << endl;
-        return 1;
+        cout << " the file filter open fail" << endl;
+        return -1;
     }
-    for (int ii = 0; ii < od; ii++)
+    float filter_data[OD];
+    for (int ii = 0; ii < OD; ii++)
     {
-        inRco.read((char *)&b[ii], sizeof(float));
+        file_read.read((char *)&filter_data[ii], sizeof(float));
     }
-
-    inRco.close();
-
-    //cout<<"filterdata:"<<b[0]<<endl;
-
-    cudaStatus = cudaMemcpyToSymbol(db, b, sizeof(float) * od);
+    file_read.close();
+    cudaStatus = cudaMemcpyToSymbol(dev_filter_data, filter_data, sizeof(float) * OD);
 
     if (cudaStatus != cudaSuccess)
     {
@@ -231,42 +356,38 @@ int main(int argc, char const *argv[])
     // return ;
     // }
 
-    ifstream inR;
-    // std::string s2 = "/media/shine/SHINE/UCTDat_2048T2048R_25M.bin";
-    std::string s2 = argv[1];
-
-    inR.open(s2.c_str(), ios_base::in | ios::binary | std::ifstream::ate);
-    if (!inR.is_open())
+    file_read.open(bin_path.c_str(), ios_base::in | ios::binary | ios::ate);
+    if (!file_read.is_open())
     {
-        cout << " the file RIO0 open fail" << endl;
+        cout << " the bin file open fail" << endl;
         return -1;
     }
-
-    long long int filesize = inR.tellg();
-    inR.seekg(0, inR.beg);
-
-    char *file_buffer = (char *)std::calloc((long long)filesize, 1);
-    if (file_buffer == NULL)
+    long long int filesize = file_read.tellg();
+    file_read.seekg(0, file_read.beg);
+    // 为 bin_buffer 申请空间，并把 filepath 的数据载入内存
+    char *bin_buffer = (char *)std::malloc(filesize);
+    if (bin_buffer == NULL)
     {
         std::cout << "ERROR :: Malloc data for buffer failed." << std::endl;
         return 0;
     }
-    inR.read(file_buffer, filesize);
-    if (inR.peek() == EOF)
+    file_read.read(bin_buffer, filesize);
+    if (file_read.peek() == EOF)
     {
-        inR.close();
+        file_read.close();
     }
     else
     {
-        std::cout << "ERROR :: Read file error." << std::endl;
+        std::cout << "ERROR :: Read bin file error." << std::endl;
+        exit(-1);
     }
-    time_t file_done = time(NULL);
-    std::cout << difftime(file_done, start) << "s for read file." << std::endl;
 
     //image line
-    get_ele_position();
+    float ele_coord_x[ELE_NO] = {0};
+    float ele_coord_y[ELE_NO] = {0};
+    get_ele_position(&ele_coord_x[0], &ele_coord_y[0]);
 
-    cudaStatus = cudaMemcpyToSymbol(dev_ele_position_center, ele_position_center, sizeof(float) * ele_no);
+    cudaStatus = cudaMemcpyToSymbol(dev_ele_coord_x, ele_coord_x, sizeof(float) * ELE_NO);
 
     if (cudaStatus != cudaSuccess)
     {
@@ -274,7 +395,7 @@ int main(int argc, char const *argv[])
         return 1;
     }
 
-    cudaMemcpyToSymbol(dev_ele_position_height, ele_position_height, sizeof(float) * ele_no);
+    cudaMemcpyToSymbol(dev_ele_coord_y, ele_coord_y, sizeof(float) * ELE_NO);
     if (cudaStatus != cudaSuccess)
     {
         cout << "height Fail to cudaMemcpyToSymbol on GPU" << endl;
@@ -299,34 +420,35 @@ int main(int argc, char const *argv[])
         //return 1;
     }
 
-    cudaStatus = cudaMemcpy(dev_sumdata, allimage_data, N * N * sizeof(float), cudaMemcpyHostToDevice);
+    cudaStatus = cudaMemcpy(dev_sumdata, image_data, N * N * sizeof(float), cudaMemcpyHostToDevice);
     if (cudaStatus != cudaSuccess)
     {
         cout << "sumdata Fail to cudaMemcpy on GPU" << endl;
         return 1;
     }
-    cudaStatus = cudaMemcpy(dev_sumpoint, allpoint_count, N * N * sizeof(int), cudaMemcpyHostToDevice);
+    cudaStatus = cudaMemcpy(dev_sumpoint, image_point_count, N * N * sizeof(int), cudaMemcpyHostToDevice);
     if (cudaStatus != cudaSuccess)
     {
         cout << "sumpoint Fail to cudaMemcpy on GPU" << endl;
         return 1;
     }
 
-    short *dev_uct_data_board0;
+    long long length_of_data_in_process = NSAMPLE * ELE_NO * sizeof(short) * parallel_emit_sum;
+    short *dev_data_samples_in_process;
     float *dev_filterdata;
 
-    cudaStatus = cudaMalloc((void **)(&dev_uct_data_board0), Nsample * ele_no * 2 * sizeof(short));
+    cudaStatus = cudaMalloc((void **)(&dev_data_samples_in_process), length_of_data_in_process);
     if (cudaStatus != cudaSuccess)
     {
-        cout << "uct_data_board0 Fail to cudaMalloc on GPU" << endl;
+        cout << "data_samples_in_process Fail to cudaMalloc on GPU" << endl;
         //goto Error;
         return cudaStatus;
     }
 
-    cudaStatus = cudaMalloc((void **)(&dev_filterdata), Nsample * ele_no * 2 * sizeof(float));
+    cudaStatus = cudaMalloc((void **)(&dev_filterdata), length_of_data_in_process * 2);
     if (cudaStatus != cudaSuccess)
     {
-        cout << "uct_data_board0 Fail to cudaMalloc on GPU" << endl;
+        cout << "data_samples_in_process Fail to cudaMalloc on GPU" << endl;
         //goto Error;
         return cudaStatus;
     }
@@ -351,34 +473,23 @@ int main(int argc, char const *argv[])
         return cudaStatus;
     }
 
-    long long file_buffer_index = 0;
-    for (int trig_time = 0; trig_time < ele_no; trig_time += 2)
+    long long bin_buffer_index = 0;
+    for (int ele_emit_id = 0; ele_emit_id < ELE_NO; ele_emit_id += parallel_emit_sum)
     //for (i=1;i<=1;i++)
     {
-        cout << "Number of element : " << trig_time + 1 << endl;
-        // for (int ii=0;ii<Nsample*ele_no*2;ii++)
-        // {
-        // 		//inR.read ( ( char * ) & uct_data_board0[ jj ][ ii ], sizeof(short));
-        // 		inR.read ( ( char * ) & uct_data_board0[ ii], sizeof(short));
-        // 		//uct_data_board0[ ii]=before_convert_data;
-        // }
-        memcpy(&uct_data_board0[0], &file_buffer[file_buffer_index], Nsample * ele_no * sizeof(short));
-        file_buffer_index = file_buffer_index + Nsample * ele_no * sizeof(short);
-        // start=time(NULL);
-        //for(int i=0;i<1024;i++){
-        // if(trig_time%2==0)
-        //{
-        // continue;
-        //}
-        //cout<<uct_data_board0[0]<<endl;
-        cudaStatus = cudaMemcpy(dev_uct_data_board0, uct_data_board0, Nsample * ele_no * 2 * sizeof(short), cudaMemcpyHostToDevice);
+        printf("Number of element : %d\n", ele_emit_id);
+
+        memcpy(&data_samples_in_process[0], &bin_buffer[bin_buffer_index], length_of_data_in_process);
+        bin_buffer_index = bin_buffer_index + length_of_data_in_process;
+
+        cudaStatus = cudaMemcpy(dev_data_samples_in_process, data_samples_in_process, length_of_data_in_process, cudaMemcpyHostToDevice);
         if (cudaStatus != cudaSuccess)
         {
-            cout << "uct_data_board0 Fail to cudaMemcpy on GPU" << endl;
+            cout << "data_samples_in_process Fail to cudaMemcpy on GPU" << endl;
             //goto Error;
             return cudaStatus;
         }
-        cudaStatus = precalcWithCuda(dev_uct_data_board0, trig_time + 1, dev_sumdata, dev_sumpoint, dev_filterdata, dev_imagedata, dev_pointcount);
+        cudaStatus = precalcWithCuda(dev_data_samples_in_process, ele_emit_id + 1, dev_sumdata, dev_sumpoint, dev_filterdata, dev_imagedata, dev_pointcount);
         //}
         // over=time(NULL);
         // cout<<"Running time is : "<<difftime(over,start)<<"s!"<<endl;
@@ -387,13 +498,9 @@ int main(int argc, char const *argv[])
             fprintf(stderr, "calcWithCuda failed!");
             return 1;
         }
-
-        //////////////////
-        //线
-
         // cudaError_t cudaStatus = calcWithCuda( i,dev_sumdata,dev_sumpoint,dev_filterdata);
     }
-    cudaStatus = cudaMemcpy(allimage_data, dev_sumdata, N * N * sizeof(float), cudaMemcpyDeviceToHost);
+    cudaStatus = cudaMemcpy(image_data, dev_sumdata, N * N * sizeof(float), cudaMemcpyDeviceToHost);
     if (cudaStatus != cudaSuccess)
     {
         cout << "allimagedata Fail to cudaMemcpy to CPU" << endl;
@@ -401,23 +508,20 @@ int main(int argc, char const *argv[])
         //goto Error;
     }
 
-    cudaStatus = cudaMemcpy(allpoint_count, dev_sumpoint, N * N * sizeof(int), cudaMemcpyDeviceToHost);
+    cudaStatus = cudaMemcpy(image_point_count, dev_sumpoint, N * N * sizeof(int), cudaMemcpyDeviceToHost);
     if (cudaStatus != cudaSuccess)
     {
         cout << "allpointcount Fail to cudaMemcpy to CPU" << endl;
         return 1;
         //goto Error;
     }
-    //cout<<allimage_data[128200]<<endl;
-    // cout<<allpoint_count[128200]<<endl;
 
-    write_txtfile();
+    write_txtfile(output_path);
     over = time(NULL);
     cout << "Running time is : " << difftime(over, start) / 60 << "min!" << endl;
-    inR.close();
     cudaFree(dev_sumdata);
     cudaFree(dev_sumpoint);
-    cudaFree(dev_uct_data_board0);
+    cudaFree(dev_data_samples_in_process);
     cudaFree(dev_filterdata);
     cudaFree(dev_imagedata);
     cudaFree(dev_pointcount);
@@ -429,157 +533,9 @@ int main(int argc, char const *argv[])
     }
 }
 
-cudaError_t precalcWithCuda(short *dev_uct_data_board0, int i, float *dev_sumdata, int *dev_sumpoint, float *dev_filterdata, float *dev_imagedata, int *dev_pointcount)
-{
-    cudaError_t cudaStatus;
-
-    //kernel 1,kernel2 decode
-    //kernel3 filter
-    kernel3<<<16, 256>>>(dev_filterdata, dev_uct_data_board0);
-    cudaStatus = cudaGetLastError();
-    if (cudaStatus != cudaSuccess)
-    {
-        cout << "Kernel3 launch failed: " << cudaGetErrorString(cudaStatus);
-        //goto Error;
-        return cudaStatus;
-    }
-
-    // cudaStatus = cudaDeviceSynchronize();
-    // if (cudaStatus != cudaSuccess) {
-    //  fprintf(stderr, "cudaDeviceSynchronize returned error code %d after launching Kernel3!\n", cudaStatus);
-    //goto Error;
-    // return cudaStatus;
-    // }
-
-    //cudaStatus= cudaMemcpy( data1_1024_output,dev_filterdata , 5000*1024 * sizeof(float),cudaMemcpyDeviceToHost ) ;
-    //  if (cudaStatus != cudaSuccess) {
-    // cout<<"data_output Fail to cudaMemcpy to CPU"<<endl;
-    //  goto Error;
-    //goto Error;
-    //  }
-
-    dim3 gridimage(N, N);
-    //dim3 threads(M);
-    kernel<<<gridimage, 2 * M>>>(i, dev_imagedata, dev_pointcount, dev_filterdata); //启动一个二维的N*N个block，每个block里面M个thread
-
-    // Check for any errors launching the kernel
-    cudaStatus = cudaGetLastError();
-    if (cudaStatus != cudaSuccess)
-    {
-        cout << "calcKernel launch failed: " << cudaGetErrorString(cudaStatus);
-        //goto Error;
-        return cudaStatus;
-    }
-
-    // cudaDeviceSynchronize waits for the kernel to finish, and returns
-    // any errors encountered during the launch.
-    //		// cudaStatus = cudaDeviceSynchronize();
-    // if (cudaStatus != cudaSuccess) {
-    // fprintf(stderr, "cudaDeviceSynchronize returned error code %d after launching calcKernel!\n", cudaStatus);
-    //goto Error;
-    // return cudaStatus;
-    //}
-    // cudaDeviceSynchronize();
-
-    //float *filter=(float*)malloc( N*N*sizeof(float));
-    // cudaStatus= cudaMemcpy(filter,dev_imagedata ,  N*N * sizeof(float),cudaMemcpyDeviceToHost ) ;
-    //  cout<<filter[128200]<<endl;
-    //把所有的结果加到一起
-    add<<<32, 32>>>(dev_sumdata, dev_sumpoint, dev_imagedata, dev_pointcount);
-    cudaStatus = cudaGetLastError();
-    if (cudaStatus != cudaSuccess)
-    {
-        cout << "addKernel launch failed: " << cudaGetErrorString(cudaStatus);
-        //goto Error;
-        return cudaStatus;
-    }
-
-    // cudaDeviceSynchronize waits for the kernel to finish, and returns
-    // any errors encountered during the launch.
-    // cudaStatus = cudaDeviceSynchronize();
-    // if (cudaStatus != cudaSuccess) {
-    // fprintf(stderr, "cudaDeviceSynchronize returned error code %d after launching addKernel!\n", cudaStatus);
-    //goto Error;
-    // return cudaStatus;
-    // }
-
-    return cudaStatus;
-}
-
-//cudaStatus= cudaMemcpy( data1_1024_output,dev_filterdata , 5000*1024 * sizeof(float),cudaMemcpyDeviceToHost ) ;
+//cudaStatus= cudaMemcpy( data_in_process,dev_filterdata , 5000*1024 * sizeof(float),cudaMemcpyDeviceToHost ) ;
 // if (cudaStatus != cudaSuccess) {
 //cout<<"data_output Fail to cudaMemcpy to CPU"<<endl;
 // goto Error;
 //goto Error;
 // }
-
-void get_ele_position()
-{
-    //float rfocus=100.0/1000;
-    //float first_one=2*PI*(45-39.1)/360;//第一个阵元角度
-    // float ele_angle=(2*PI*39.1/(128-1))/360;//阵元间隔角度
-
-    for (int i = 1; i < 257; i++)
-    {
-        ele_position_center[i - 1] = rfocus * cos(first_one + (i - 1) * ele_angle);
-        ele_position_height[i - 1] = -rfocus * sin(first_one + (i - 1) * ele_angle);
-    }
-    for (int i = 257; i < 513; i++)
-    {
-        ele_position_center[i - 1] = rfocus * cos(first_one + (i - 257) * ele_angle + PI / 4);
-        ele_position_height[i - 1] = -rfocus * sin(first_one + (i - 257) * ele_angle + PI / 4);
-    }
-    for (int i = 513; i < 769; i++)
-    {
-        ele_position_center[i - 1] = rfocus * cos(first_one + (i - 513) * ele_angle + PI / 2);
-        ele_position_height[i - 1] = -rfocus * sin(first_one + (i - 513) * ele_angle + PI / 2);
-    }
-    for (int i = 769; i < 1025; i++)
-    {
-        ele_position_center[i - 1] = rfocus * cos(first_one + (i - 769) * ele_angle + 3 * PI / 4);
-        ele_position_height[i - 1] = -rfocus * sin(first_one + (i - 769) * ele_angle + 3 * PI / 4);
-    }
-    for (int i = 1025; i < 1281; i++)
-    {
-        ele_position_center[i - 1] = rfocus * cos(first_one + (i - 1025) * ele_angle + PI);
-        ele_position_height[i - 1] = -rfocus * sin(first_one + (i - 1025) * ele_angle + PI);
-    }
-    for (int i = 1281; i < 1537; i++)
-    {
-        ele_position_center[i - 1] = rfocus * cos(first_one + (i - 1281) * ele_angle + 5 * PI / 4);
-        ele_position_height[i - 1] = -rfocus * sin(first_one + (i - 1281) * ele_angle + 5 * PI / 4);
-    }
-    for (int i = 1537; i < 1793; i++)
-    {
-        ele_position_center[i - 1] = rfocus * cos(first_one + (i - 1537) * ele_angle + 3 * PI / 2);
-        ele_position_height[i - 1] = -rfocus * sin(first_one + (i - 1537) * ele_angle + 3 * PI / 2);
-    }
-    for (int i = 1793; i < 2049; i++)
-    {
-        ele_position_center[i - 1] = rfocus * cos(first_one + (i - 1793) * ele_angle + 7 * PI / 4);
-        ele_position_height[i - 1] = -rfocus * sin(first_one + (i - 1793) * ele_angle + 7 * PI / 4);
-    }
-}
-void write_txtfile()
-{
-    ofstream outfile("filter_das_2048element_052A_1520_224_40du_2048_tgc0014_25M.txt");
-    if (!outfile.is_open())
-    {
-        cout << " the file open fail" << endl;
-        exit(1);
-    }
-
-    for (int k = 0; k < N; k++)
-    {
-        for (int j = 0; j < N; j++)
-        {
-            if (allpoint_count[k * N + j] == 0)
-                outfile << allimage_data[k * N + j] << " ";
-            else
-                outfile << allimage_data[k * N + j] / allpoint_count[k * N + j] << " ";
-        }
-        outfile << "\r\n";
-    }
-
-    outfile.close();
-}

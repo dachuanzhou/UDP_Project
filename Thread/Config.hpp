@@ -22,9 +22,10 @@
 
 class Config
 {
-private:
+  private:
     /* data */
-public:
+  public:
+    int node_id;
     int system_cpu_cores;
     int program_check_slices_threads_sum;
     int program_pcap_read_threads_sum;
@@ -41,6 +42,7 @@ Config::Config(std::string config_file)
 {
     boost::property_tree::ptree ptree;
     boost::property_tree::ini_parser::read_ini(config_file, ptree);
+    node_id = ptree.get<int>("system.Node_ID");
     system_cpu_cores = ptree.get<int>("system.CPU_Cores");
     program_check_slices_threads_sum = ptree.get<int>("system.Check_Slices_Threads_Sum");
     program_pcap_read_threads_sum = ptree.get<int>("system.Pcap_Read_Threads_Sum");
@@ -61,6 +63,7 @@ Config::Config(std::string config_file)
 void Config::create_template()
 {
     boost::property_tree::ptree ptree;
+    ptree.add("system.Node_ID", 0);
     ptree.add("system.CPU_Cores", 0);
     ptree.add("system.Check_Slices_Threads_Sum", 0);
     ptree.add("system.Pcap_Read_Threads_Sum", 0);

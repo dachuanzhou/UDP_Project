@@ -20,6 +20,7 @@
 int main(int argc, char const *argv[])
 {
     auto start_time_main = std::chrono::high_resolution_clock::now();
+    auto end_time = std::chrono::high_resolution_clock::now();
     std::string cfg_file, id, name;
     std::string slice_index;
     int save_type = 0;
@@ -58,32 +59,20 @@ int main(int argc, char const *argv[])
         std::cout << "ERROR :: Slice " << slice_index << " : "
                   << "pcap from " << config.raw_data_ids[0] << " to " << config.raw_data_ids[config.raw_data_ids.size() - 1] << " load failed." << std::endl;
     }
-    std::cout << "Slice " << slice_index << " : "
+    std::cout << "INFO :: UCT" << ptr->config.node_id << " -> Slice " << slice_index << " : "
               << "pcap from " << config.raw_data_ids[0] << " to " << config.raw_data_ids[config.raw_data_ids.size() - 1] << " load successful." << std::endl;
-    auto end_time = std::chrono::high_resolution_clock::now();
-    std::cout << "INFO :: " << std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time_main).count() << "ms for load pcap files." << std::endl;
+    // end_time = std::chrono::high_resolution_clock::now();
+    // std::cout << "INFO :: " << std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time_main).count() << "ms for load pcap files." << std::endl;
 
     // 检查 Pcap 文件中包的顺序
-    auto start_time_check = std::chrono::high_resolution_clock::now();
+    // auto start_time_check = std::chrono::high_resolution_clock::now();
     if (ptr->check_index_data() != 1)
     {
         std::cout << "ERROR :: slice " << slice_index << " order error." << std::endl;
         return 0;
     }
-    end_time = std::chrono::high_resolution_clock::now();
-    std::cout << "INFO :: " << std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time_check).count() << "ms for check package order." << std::endl;
-
-    // for debug
-    
-    // for(int i = 0; i < 157; i++)
-    // {
-    //     printf("%04d ::", (int)56 * i);
-    //     for (int j = 0; j < 56; j++)
-    //     {
-    //         printf(" %02x", (unsigned char)ptr->raw_data[i * 56 + j]);
-    //     }
-    //     printf("\n");
-    // }
+    // end_time = std::chrono::high_resolution_clock::now();
+    // std::cout << "INFO :: " << std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time_check).count() << "ms for check package order." << std::endl;
 
     // 解码
     auto start_time_decode = std::chrono::high_resolution_clock::now();
@@ -95,7 +84,7 @@ int main(int argc, char const *argv[])
     end_time = std::chrono::high_resolution_clock::now();
     std::cout << "INFO :: " << std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time_decode).count() << "ms for decode data." << std::endl;
 
-    auto start_time_save = std::chrono::high_resolution_clock::now();
+    // auto start_time_save = std::chrono::high_resolution_clock::now();
 
     // 保存解码后的文件
     switch (save_type)
@@ -119,14 +108,14 @@ int main(int argc, char const *argv[])
     }
 
     end_time = std::chrono::high_resolution_clock::now();
-    std::cout << "INFO :: " << std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time_save).count() << "ms for save decode data." << std::endl;
-
+    // std::cout << "INFO :: " << std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time_save).count() << "ms for save decode data." << std::endl;
+    std::cout << "Finish :: UCT" << ptr->config.node_id << " save decode data in " << std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time_main).count() << "ms (total)." << std::endl;
     // 释放指针
     free(pptr);
     free(ptr);
 
-    end_time = std::chrono::high_resolution_clock::now();
-    std::cout << "INFO :: Total running " << std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time_main).count() << "ms" << std::endl;
+    // end_time = std::chrono::high_resolution_clock::now();
+    // std::cout << "INFO :: Total running " << std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time_main).count() << "ms" << std::endl;
 
     exit(0);
 }
