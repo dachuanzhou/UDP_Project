@@ -35,12 +35,12 @@ cd $var_datadir
 echo "---------- Initialization Tshark on uct3----------"
 
 # sleep 2
-tshark -i enp101s0f0 -f 'udp src port 5048' -B 1024 -c 614400 -w 'DatPort17.pcap' &
-tshark -i enp101s0f1 -f 'udp src port 5048' -B 1024 -c 614400 -w 'DatPort18.pcap' &
-tshark -i enp101s0f2 -f 'udp src port 5048' -B 1024 -c 614400 -w 'DatPort19.pcap' &
-tshark -i enp101s0f3 -f 'udp src port 5048' -B 1024 -c 614400 -w 'DatPort20.pcap' &
-tshark -i enp179s0f0 -f 'udp src port 5048' -B 1024 -c 614400 -w 'DatPort21.pcap' &
-tshark -i enp179s0f1 -f 'udp src port 5048' -B 1024 -c 614400 -w 'DatPort16.pcap' &
+tshark -i enp101s0f0 -f 'udp src port 5048' -B 1024 -c 614400 -w 'DatPort16.pcap' &
+tshark -i enp101s0f1 -f 'udp src port 5048' -B 1024 -c 614400 -w 'DatPort17.pcap' &
+tshark -i enp101s0f2 -f 'udp src port 5048' -B 1024 -c 614400 -w 'DatPort18.pcap' &
+tshark -i enp101s0f3 -f 'udp src port 5048' -B 1024 -c 614400 -w 'DatPort19.pcap' &
+tshark -i enp179s0f0 -f 'udp src port 5048' -B 1024 -c 614400 -w 'DatPort20.pcap' &
+tshark -i enp179s0f1 -f 'udp src port 5048' -B 1024 -c 614400 -w 'DatPort21.pcap' &
 tshark -i enp179s0f2 -f 'udp src port 5048' -B 1024 -c 614400 -w 'DatPort22.pcap' &
 tshark -i enp179s0f3 -f 'udp src port 5048' -B 1024 -c 614400 -w 'DatPort23.pcap' &
 sleep 6

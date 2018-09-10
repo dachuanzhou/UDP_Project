@@ -114,19 +114,18 @@ __global__ void kernel(int i, float *image_data, int *point_count, float *trans_
             float disj = sqrtf((dev_ele_coord_x[j] - x) * (dev_ele_coord_x[j] - x) + (z1 - dev_ele_coord_y[j]) * (z1 - dev_ele_coord_y[j]));
             float ilength = 112.0 / 1000;
             float imagelength = sqrtf(x * x + z1 * z1);
-            float angle = acos((ilength * ilength + disi * disi - imagelength * imagelength) / 2 / ilength / disi);
+            float angle = acosf((ilength * ilength + disi * disi - imagelength * imagelength) / 2 / ilength / disi);
             if ((disi >= 0.1 * 2 / 3 && (abs(i - j - 1) < 256 || abs(i - j - 1) > 2048 - 256)) || (disi >= 0.1 * 1 / 3 && (abs(i - j - 1) < 200 || abs(i - j - 1) > 2048 - 200)) || (disi >= 0 && (abs(i - j - 1) < 100 || abs(i - j - 1) > 2048 - 100)))
             {
-             int num = (disi + disj) / c * fs + 0.5;
+                int num = (disi + disj) / c * fs + 0.5;
 
-                 if (((num + middot + (OD - 1 - 1) / 2) > 100) && ((num + middot + (OD - 1 - 1) / 2) <= point_length) && (angle < PI / 9))
-                 {
-                    u += trans_sdata[(num + middot + (OD - 1 - 1) / 2) * ELE_NO + j] * exp(xg * (num - 1));
-                    u += ((num + middot + (OD - 1 - 1) / 2) * ELE_NO + j) * exp(xg * (num - 1));
+                if (((num + middot + (OD - 1 - 1) / 2) > 100) && ((num + middot + (OD - 1 - 1) / 2) <= point_length) && (angle < PI / 9))
+                {
+                    u += trans_sdata[(num + middot + (OD - 1 - 1) / 2) * ELE_NO + j] * expf(xg * (num - 1));
 
-                     point_count_1 += 1;
-                 }
-             }
+                    point_count_1 += 1;
+                }
+            }
         }
         cache_image[cacheIndex] = u;
         cache_point[cacheIndex] = point_count_1;
