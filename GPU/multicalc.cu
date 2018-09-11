@@ -327,6 +327,8 @@ int main(int argc, char const *argv[])
 
     cudaError_t cudaStatus;
 
+    time_t start_read, over_read;
+    start_read = time(NULL);
     // Read filter data and put in GPU
     ifstream file_read;
     file_read.open(filter_path.c_str(), ios_base::in | ios::binary);
@@ -380,6 +382,8 @@ int main(int argc, char const *argv[])
         std::cout << "ERROR :: Read bin file error." << std::endl;
         exit(-1);
     }
+    over_read = time(NULL);
+    cout << "Reading time is : " << difftime(over_read, start_read) << "s!" << endl;
 
     //image line
     float ele_coord_x[ELE_NO] = {0};
