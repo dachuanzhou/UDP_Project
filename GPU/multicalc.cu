@@ -21,48 +21,71 @@ using namespace std;
 
 int parallel_emit_sum = 1;
 
+/* struct CONST_VALUE
+{
+    float sample_frequency_div_sound_speed;
+    float image_width;
+    float image_length;
+    float data_diameter;
+    int point_length;
+    float d_x;
+    float d_z;
+    int middot; //发射前1us开始接收，也就是约为12.5个点之后发射,数据显示约16个点
+                       //const int ELE_NO=1024;
+};
+
+__constant__ CONST_VALUE const_value; */
+
 //const int sample_point_num=5000;
 
 __device__ float dev_ele_coord_x[ELE_NO];
 __device__ float dev_ele_coord_y[ELE_NO]; //写到纹理内存里面
 __device__ float dev_filter_data[OD];     //filter parameter
 
-short data_samples_in_process[NSAMPLE * ELE_NO * 2] = {0}; //写到页锁定主机内存
+// short data_samples_in_process[NSAMPLE * ELE_NO * 2] = {0}; //写到页锁定主机内存
 float image_data[N * N] = {0};
 int image_point_count[N * N] = {0};
 
-__global__ void kernel3(float *filterdata, short *data_in_process)
+__global__ void kernel3(float *filtered_data, short *data_in_process)
 {
-    int bid = blockIdx.x;
-    int tid = threadIdx.x;
-    int id = blockDim.x * bid + tid;
+    int column_id = blockDim.x * blockIdx.x + threadIdx.x;
     short data[NSAMPLE];
     float filter_temp_data[NSAMPLE];
 
-    if (id < ELE_NO)
+    if (column_id < gridDim.x * blockDim.x) // 没有意义，但是不能删除
     {
-        //da[0]=0.0;
         memset(filter_temp_data, 0, NSAMPLE * sizeof(float));
-        for (int i = 0; i < NSAMPLE; i++)
+        for (int sample_cnt = 0; sample_cnt < NSAMPLE; sample_cnt++)
         {
-            data[i] = data_in_process[i * ELE_NO + id];
-            for (int j = 0; i >= j && j < OD; j++)
+            data[sample_cnt] = data_in_process[sample_cnt * ELE_NO + column_id];
+            for (int j = 0; sample_cnt >= j && j < OD; j++)
 
             {
-                //filter_temp_data[i] += (dev_filter_data[j]*data[i-j]-da[j]*filter_temp_data[i-j]);
-                filter_temp_data[i] += (dev_filter_data[j] * data[i - j]);
+                filter_temp_data[sample_cnt] += (dev_filter_data[j] * data[sample_cnt - j]);
             }
         }
-        //da[0]=1.0;
 
         for (int i = 0; i < NSAMPLE; i++)
         {
-            filterdata[i * ELE_NO + id] = filter_temp_data[i];
+            filtered_data[i * ELE_NO + column_id] = filter_temp_data[i];
         }
     }
 }
 
-__global__ void kernel(int i, float *image_data, int *point_count, float *trans_sdata)
+// 滤波函数
+__global__ void filter_func(float *filtered_data, short *data_in_process)
+{
+    int column_id = blockDim.x * blockIdx.x + threadIdx.x;
+    for (int sample_cnt = 0; sample_cnt < NSAMPLE; sample_cnt++)
+    {
+        for (int j = 0; sample_cnt >= j && j < OD; j++)
+        {
+            filtered_data[(column_id / 2048) * ELE_NO * NSAMPLE + sample_cnt * ELE_NO + column_id % 2048] += (dev_filter_data[j] * data_in_process[(sample_cnt - j) * ELE_NO + (column_id / 2048) * ELE_NO * NSAMPLE + column_id % 2048]);
+        }
+    }
+}
+
+__global__ void kernel(int i, float *image_data, int *point_count, float *trans_sdata, int parallel_emit_sum)
 {
     int c = 1520;
     float fs = 25e6;
@@ -84,7 +107,7 @@ __global__ void kernel(int i, float *image_data, int *point_count, float *trans_
     int nn = blockIdx.x;                           //点
                                                    //blockIdx.x+blockIdx.y * gridDimx.x
     int y = threadIdx.x;                           //接收阵元
-    int j = i - 1 - M + y;                         //接收阵元
+    int j = i - M + y;                             //接收阵元
     int bid = blockIdx.x + blockIdx.y * gridDim.x; //线程块的索引
     // int tid = blockDim.x * bid + threadIkdx.x;      //线程的索引
 
@@ -104,24 +127,117 @@ __global__ void kernel(int i, float *image_data, int *point_count, float *trans_
         // for(int jj=1;jj<=ELE_NO/M;jj++)
         // {
         //  int j=y*ELE_NO/M+jj;
-        for (int jj = 0; jj < 2; jj++)
+        for (int jj = 0; jj < parallel_emit_sum; jj++)
         {
             i = i + jj;
-            int j = i - 1 - M + y; //接收阵元
+            int j = i - M + y; //接收阵元
             j = (j + ELE_NO) % ELE_NO;
 
-            float disi = sqrtf((dev_ele_coord_x[i - 1] - x) * (dev_ele_coord_x[i - 1] - x) + (z1 - dev_ele_coord_y[i - 1]) * (z1 - dev_ele_coord_y[i - 1]));
+            float disi = sqrtf((dev_ele_coord_x[i] - x) * (dev_ele_coord_x[i] - x) + (z1 - dev_ele_coord_y[i]) * (z1 - dev_ele_coord_y[i]));
             float disj = sqrtf((dev_ele_coord_x[j] - x) * (dev_ele_coord_x[j] - x) + (z1 - dev_ele_coord_y[j]) * (z1 - dev_ele_coord_y[j]));
             float ilength = 112.0 / 1000;
             float imagelength = sqrtf(x * x + z1 * z1);
             float angle = acosf((ilength * ilength + disi * disi - imagelength * imagelength) / 2 / ilength / disi);
-            if ((disi >= 0.1 * 2 / 3 && (abs(i - j - 1) < 256 || abs(i - j - 1) > 2048 - 256)) || (disi >= 0.1 * 1 / 3 && (abs(i - j - 1) < 200 || abs(i - j - 1) > 2048 - 200)) || (disi >= 0 && (abs(i - j - 1) < 100 || abs(i - j - 1) > 2048 - 100)))
+            if ((disi >= 0.1 * 2 / 3 && (abs(i - j) < 256 || abs(i - j) > 2048 - 256)) || (disi >= 0.1 * 1 / 3 && (abs(i - j) < 200 || abs(i - j) > 2048 - 200)) || (disi >= 0 && (abs(i - j) < 100 || abs(i - j) > 2048 - 100)))
             {
                 int num = (disi + disj) / c * fs + 0.5;
 
                 if (((num + middot + (OD - 1 - 1) / 2) > 100) && ((num + middot + (OD - 1 - 1) / 2) <= point_length) && (angle < PI / 9))
                 {
                     u += trans_sdata[(num + middot + (OD - 1 - 1) / 2) * ELE_NO + j] * expf(xg * (num - 1));
+
+                    point_count_1 += 1;
+                }
+            }
+        }
+        cache_image[cacheIndex] = u;
+        cache_point[cacheIndex] = point_count_1;
+
+        __syncthreads();
+
+        /*int jj=1;
+		while((cacheIndex + jj)< blockDim.x){
+		cache_image2[cacheIndex]+=cache_image[cacheIndex]*cache_image[cacheIndex + jj];
+		 __syncthreads();
+                 jj= jj+1;
+		}*/
+
+        int i = blockDim.x / 2;
+        while (i != 0)
+        {
+            if (cacheIndex < i)
+            {
+                cache_image[cacheIndex] += cache_image[cacheIndex + i];
+                cache_point[cacheIndex] += cache_point[cacheIndex + i];
+            }
+            __syncthreads();
+            i /= 2;
+        }
+
+        if (cacheIndex == 0)
+        {
+            image_data[bid] = cache_image[0];
+            point_count[bid] = cache_point[0];
+        }
+    }
+}
+
+__global__ void calc_func(int i, float *image_data, int *point_count, float *trans_sdata, int parallel_emit_sum)
+{
+    int c = 1520;
+    float fs = 25e6;
+    float image_width = 200.0 / 1000;
+    float image_length = 200.0 / 1000;
+    float data_diameter = 220.0 / 1000;
+    int point_length = data_diameter / c * fs + 0.5;
+    float d_x = image_width / (N - 1);
+    float d_z = image_length / (N - 1);
+
+    int middot = -160; //发射前1us开始接收，也就是约为12.5个点之后发射,数据显示约16个点
+                       //const int ELE_NO=1024;
+
+    int k_line = blockIdx.y;                       //线
+    int nn = blockIdx.x;                           //点
+                                                   //blockIdx.x+blockIdx.y * gridDimx.x
+    int y = threadIdx.x;                           //接收阵元
+    int j = i - M + y;                             //接收阵元
+    int bid = blockIdx.x + blockIdx.y * gridDim.x; //线程块的索引
+    // int tid = blockDim.x * bid + threadIkdx.x;      //线程的索引
+
+    __shared__ float cache_image[2 * M];
+    __shared__ int cache_point[2 * M];
+    /*__shared__ float cache_image2[512];*/
+    int cacheIndex = threadIdx.x;
+
+    if (k_line < N && nn < N && y < 2 * M)
+    {
+        float u = 0;
+        int point_count_1 = 0;
+        float z1 = -image_length / 2 + d_z * nn;
+        float x = -image_length / 2 + d_x * k_line;
+        float xg = 0.0014;
+
+        // for(int jj=1;jj<=ELE_NO/M;jj++)
+        // {
+        //  int j=y*ELE_NO/M+jj;
+        for (int jj = 0; jj < parallel_emit_sum; jj++)
+        {
+            i = i + jj;
+            int j = i - M + y; //接收阵元
+            j = (j + ELE_NO) % ELE_NO;
+
+            float disi = sqrtf((dev_ele_coord_x[i] - x) * (dev_ele_coord_x[i] - x) + (z1 - dev_ele_coord_y[i]) * (z1 - dev_ele_coord_y[i]));
+            float disj = sqrtf((dev_ele_coord_x[j] - x) * (dev_ele_coord_x[j] - x) + (z1 - dev_ele_coord_y[j]) * (z1 - dev_ele_coord_y[j]));
+            float ilength = 112.0 / 1000;
+            float imagelength = sqrtf(x * x + z1 * z1);
+            float angle = acosf((ilength * ilength + disi * disi - imagelength * imagelength) / 2 / ilength / disi);
+            if ((disi >= 0.1 * 2 / 3 && (abs(i - j) < 256 || abs(i - j) > 2048 - 256)) || (disi >= 0.1 * 1 / 3 && (abs(i - j) < 200 || abs(i - j) > 2048 - 200)) || (disi >= 0 && (abs(i - j) < 100 || abs(i - j) > 2048 - 100)))
+            {
+                int num = (disi + disj) / c * fs + 0.5;
+
+                if (((num + middot + (OD - 1 - 1) / 2) > 100) && ((num + middot + (OD - 1 - 1) / 2) <= point_length) && (angle < PI / 9))
+                {
+                    u += trans_sdata[(num + middot + (OD - 1 - 1) / 2) * ELE_NO + j + jj * ELE_NO * NSAMPLE] * expf(xg * (num - 1));
 
                     point_count_1 += 1;
                 }
@@ -170,26 +286,27 @@ __global__ void add(float *sumdata, int *sumpoint, float *imagedata, int *point_
     }
 }
 
-cudaError_t precalcWithCuda(short *dev_data_samples_in_process, int ele_emit_id, float *dev_sumdata, int *dev_sumpoint, float *dev_filterdata, float *dev_imagedata, int *dev_pointcount)
+cudaError_t precalcWithCuda(short *dev_data_samples_in_process, int ele_emit_id, float *dev_sumdata, int *dev_sumpoint, float *dev_filterdata, float *dev_imagedata, int *dev_pointcount, int parallel_emit_sum)
 {
     cudaError_t cudaStatus;
 
     //kernel 1,kernel2 decode
     //kernel3 filter
-    kernel3<<<16, 256>>>(dev_filterdata, dev_data_samples_in_process);
-    cudaStatus = cudaGetLastError();
-    if (cudaStatus != cudaSuccess)
-    {
-        cout << "Kernel3 launch failed: " << cudaGetErrorString(cudaStatus);
-        //goto Error;
-        return cudaStatus;
-    }
+    cudaMemset(dev_filterdata, 0, NSAMPLE * ELE_NO * sizeof(short) * parallel_emit_sum * 2);
+    filter_func<<<4 * parallel_emit_sum, 512>>>(dev_filterdata, dev_data_samples_in_process);
+    // cudaStatus = cudaGetLastError();
+    // if (cudaStatus != cudaSuccess)
+    // {
+    //     cout << "filter_func launch failed: " << cudaGetErrorString(cudaStatus);
+    //     //goto Error;
+    //     return cudaStatus;
+    // }
 
     // cudaStatus = cudaDeviceSynchronize();
 
     dim3 gridimage(N, N);
     //dim3 threads(M);
-    kernel<<<gridimage, 2 * M>>>(ele_emit_id, dev_imagedata, dev_pointcount, dev_filterdata); //启动一个二维的N*N个block，每个block里面M个thread
+    calc_func<<<gridimage, 2 * M>>>(ele_emit_id, dev_imagedata, dev_pointcount, dev_filterdata, parallel_emit_sum); //启动一个二维的N*N个block，每个block里面M个thread
 
     // Check for any errors launching the kernel
     cudaStatus = cudaGetLastError();
@@ -300,6 +417,24 @@ int main(int argc, char const *argv[])
     time_t start, over;
     start = time(NULL);
 
+    /* float sound_speed = 1520;
+    float sample_frequency = 25e6;
+    struct CONST_VALUE temp;
+    temp.sample_frequency_div_sound_speed = sample_frequency/sound_speed;
+    temp.image_width = 200.0 / 1000;
+    temp.image_length = 200.0 / 1000;
+    temp.data_diameter = 220.0 / 1000;
+    temp.point_length = temp.data_diameter * temp.sample_frequency_div_sound_speed + 0.5;
+    temp.d_x = temp.image_width / (N - 1);
+    temp.d_z = temp.image_length / (N - 1);
+    temp.middot = -160; //发射前1us开始接收，也就是约为12.5个点之后发射,数据显示约16个点
+                       //const int ELE_NO=1024;
+
+    if (cudaMemcpyToSymbol(&const_value, &temp, sizeof(temp)) != cudaSuccess)
+    {
+        cout << "ERROR :: struct CONST_VALUE copy failed." << endl;
+    } */
+
     std::string filter_path = "";
     std::string bin_path = "";
     std::string output_path = "";
@@ -350,12 +485,6 @@ int main(int argc, char const *argv[])
         cout << "center Fail to cudaMemcpyToSymbol on GPU" << endl;
         return;
     }
-    //cudaStatus=cudaMemcpyToSymbol(da,a,sizeof(float)*31);
-
-    //if (cudaStatus != cudaSuccess) {
-    //  cout<<"center Fail to cudaMemcpyToSymbol on GPU"<<endl;
-    // return ;
-    // }
 
     file_read.open(bin_path.c_str(), ios_base::in | ios::binary | ios::ate);
     if (!file_read.is_open())
@@ -385,55 +514,45 @@ int main(int argc, char const *argv[])
     over_read = time(NULL);
     cout << "Reading time is : " << difftime(over_read, start_read) << "s!" << endl;
 
-    //image line
+    //image grid
     float ele_coord_x[ELE_NO] = {0};
     float ele_coord_y[ELE_NO] = {0};
     get_ele_position(&ele_coord_x[0], &ele_coord_y[0]);
 
-    cudaStatus = cudaMemcpyToSymbol(dev_ele_coord_x, ele_coord_x, sizeof(float) * ELE_NO);
-
-    if (cudaStatus != cudaSuccess)
+    if (cudaMemcpyToSymbol(dev_ele_coord_x, ele_coord_x, sizeof(float) * ELE_NO) != cudaSuccess)
     {
-        cout << "center Fail to cudaMemcpyToSymbol on GPU" << endl;
-        return 1;
+        cout << "ERROR :: Failed for cudaMemcpyToSymbol dev_ele_coord_x." << endl;
+        return -1;
     }
 
-    cudaMemcpyToSymbol(dev_ele_coord_y, ele_coord_y, sizeof(float) * ELE_NO);
-    if (cudaStatus != cudaSuccess)
+    if (cudaMemcpyToSymbol(dev_ele_coord_y, ele_coord_y, sizeof(float) * ELE_NO) != cudaSuccess)
     {
-        cout << "height Fail to cudaMemcpyToSymbol on GPU" << endl;
-        return 1;
+        cout << "ERROR :: Failed for cudaMemcpyToSymbol dev_ele_coord_y." << endl;
+        return -1;
     }
 
     float *dev_sumdata;
     int *dev_sumpoint;
-
-    cudaStatus = cudaMalloc((void **)(&dev_sumdata), N * N * sizeof(float));
-    if (cudaStatus != cudaSuccess)
+    if (cudaMalloc((void **)(&dev_sumdata), N * N * sizeof(float)) != cudaSuccess)
     {
-        cout << "sumdata Fail to cudaMalloc on GPU" << endl;
-        return 1;
-        //return 1;
+        cout << "ERROR :: Failed for cudaMalloc dev_sumdata." << endl;
+        return -1;
     }
-    cudaStatus = cudaMalloc((void **)(&dev_sumpoint), N * N * sizeof(int));
-    if (cudaStatus != cudaSuccess)
+    if (cudaMalloc((void **)(&dev_sumpoint), N * N * sizeof(int)) != cudaSuccess)
     {
-        cout << "sumpoint Fail to cudaMalloc on GPU" << endl;
-        return 1;
-        //return 1;
+        cout << "ERROR :: Failed for cudaMalloc dev_sumpoint." << endl;
+        return -1;
     }
-
-    cudaStatus = cudaMemcpy(dev_sumdata, image_data, N * N * sizeof(float), cudaMemcpyHostToDevice);
-    if (cudaStatus != cudaSuccess)
+    // init dev_sumdata and dev_sumpoint
+    if (cudaMemcpy(dev_sumdata, image_data, N * N * sizeof(float), cudaMemcpyHostToDevice) != cudaSuccess)
     {
-        cout << "sumdata Fail to cudaMemcpy on GPU" << endl;
-        return 1;
+        cout << "ERROR :: Failed for cudaMemcpy dev_sumdata." << endl;
+        return -1;
     }
-    cudaStatus = cudaMemcpy(dev_sumpoint, image_point_count, N * N * sizeof(int), cudaMemcpyHostToDevice);
-    if (cudaStatus != cudaSuccess)
+    if (cudaMemcpy(dev_sumpoint, image_point_count, N * N * sizeof(int), cudaMemcpyHostToDevice) != cudaSuccess)
     {
-        cout << "sumpoint Fail to cudaMemcpy on GPU" << endl;
-        return 1;
+        cout << "ERROR :: Failed for cudaMemcpy dev_sumpoint." << endl;
+        return -1;
     }
 
     long long length_of_data_in_process = NSAMPLE * ELE_NO * sizeof(short) * parallel_emit_sum;
@@ -444,17 +563,15 @@ int main(int argc, char const *argv[])
     if (cudaStatus != cudaSuccess)
     {
         cout << "data_samples_in_process Fail to cudaMalloc on GPU" << endl;
-        //goto Error;
-        return cudaStatus;
+        return -1;
     }
 
-    cudaStatus = cudaMalloc((void **)(&dev_filterdata), length_of_data_in_process * 2);
-    if (cudaStatus != cudaSuccess)
+    if (cudaMalloc((void **)(&dev_filterdata), length_of_data_in_process * 2) != cudaSuccess) // 转 float 乘以 2
     {
-        cout << "data_samples_in_process Fail to cudaMalloc on GPU" << endl;
-        //goto Error;
-        return cudaStatus;
+        cout << "ERROR :: Failed for cudaMalloc dev_filterdata." << endl;
+        return -1;
     }
+
     float *dev_imagedata;
     // float *dev_trans_sdata;
 
@@ -482,17 +599,19 @@ int main(int argc, char const *argv[])
     {
         printf("Number of element : %d\n", ele_emit_id);
 
-        memcpy(&data_samples_in_process[0], &bin_buffer[bin_buffer_index], length_of_data_in_process);
-        bin_buffer_index = bin_buffer_index + length_of_data_in_process;
+        // memcpy(&data_samples_in_process[0], &bin_buffer[bin_buffer_index], length_of_data_in_process);
+        // bin_buffer_index = bin_buffer_index + length_of_data_in_process;
 
-        cudaStatus = cudaMemcpy(dev_data_samples_in_process, data_samples_in_process, length_of_data_in_process, cudaMemcpyHostToDevice);
+        // cudaStatus = cudaMemcpy(dev_data_samples_in_process, data_samples_in_process, length_of_data_in_process, cudaMemcpyHostToDevice);
+        cudaStatus = cudaMemcpy(dev_data_samples_in_process, &bin_buffer[bin_buffer_index], length_of_data_in_process, cudaMemcpyHostToDevice);
+        bin_buffer_index = bin_buffer_index + length_of_data_in_process;
         if (cudaStatus != cudaSuccess)
         {
             cout << "data_samples_in_process Fail to cudaMemcpy on GPU" << endl;
             //goto Error;
             return cudaStatus;
         }
-        cudaStatus = precalcWithCuda(dev_data_samples_in_process, ele_emit_id + 1, dev_sumdata, dev_sumpoint, dev_filterdata, dev_imagedata, dev_pointcount);
+        cudaStatus = precalcWithCuda(dev_data_samples_in_process, ele_emit_id, dev_sumdata, dev_sumpoint, dev_filterdata, dev_imagedata, dev_pointcount, parallel_emit_sum);
         //}
         // over=time(NULL);
         // cout<<"Running time is : "<<difftime(over,start)<<"s!"<<endl;

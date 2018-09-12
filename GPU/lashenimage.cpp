@@ -17,7 +17,7 @@ using namespace cv;
 using namespace std;
 #define max(x, y) ((x) < (y) ? (y) : (x))
 #define min(x, y) ((x) > (y) ? (y) : (x))
-const int no_lines = 2048;
+int no_lines = 2048;
 
 void medianfilter(float *image, float *result, int N);
 void _medianfilter(float *image, float *result, int N);
@@ -32,6 +32,12 @@ int main(int argc, char const *argv[])
     // file.open("1024.txt");
     //Mat Ky1_Data = Mat::zeros(no_lines, no_lines, CV_32FC1);
     string infile = argv[1];
+
+    if (argc == 3)
+    {
+        no_lines = atoi(argv[2]);
+    }
+
     float *data = (float *)malloc(sizeof(float) * no_lines * no_lines);
     float *logdata = (float *)malloc(sizeof(float) * no_lines * no_lines);
     float *logdata2 = (float *)malloc(sizeof(float) * no_lines * no_lines);
