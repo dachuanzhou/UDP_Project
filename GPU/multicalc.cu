@@ -85,7 +85,7 @@ __global__ void filter_func(float *filtered_data, short *data_in_process)
     }
 }
 
-__global__ void kernel(int i, float *image_data, int *point_count, float *trans_sdata, int parallel_emit_sum)
+__global__ void kernel(int ele_emit_id, float *image_data, int *point_count, float *trans_sdata, int parallel_emit_sum)
 {
     int c = 1520;
     float fs = 25e6;
@@ -103,11 +103,11 @@ __global__ void kernel(int i, float *image_data, int *point_count, float *trans_
     int middot = -160; //发射前1us开始接收，也就是约为12.5个点之后发射,数据显示约16个点
                        //const int ELE_NO=1024;
 
-    int k_line = blockIdx.y;                       //线
-    int nn = blockIdx.x;                           //点
+    int pixel_line = blockIdx.y;                   //线
+    int pixel_point = blockIdx.x;                           //点
                                                    //blockIdx.x+blockIdx.y * gridDimx.x
-    int y = threadIdx.x;                           //接收阵元
-    int j = i - M + y;                             //接收阵元
+    int id_rec = threadIdx.x;                       //接收阵元线程索引
+    int ele_receive_id = ele_emit_id - M + id_rec;      //接收阵元
     int bid = blockIdx.x + blockIdx.y * gridDim.x; //线程块的索引
     // int tid = blockDim.x * bid + threadIkdx.x;      //线程的索引
 
@@ -116,12 +116,12 @@ __global__ void kernel(int i, float *image_data, int *point_count, float *trans_
     /*__shared__ float cache_image2[512];*/
     int cacheIndex = threadIdx.x;
 
-    if (k_line < N && nn < N && y < 2 * M)
+    if (pixel_line < N && pixel_point < N && id_rec < 2 * M)
     {
-        float u = 0;
-        int point_count_1 = 0;
-        float z1 = -image_length / 2 + d_z * nn;
-        float x = -image_length / 2 + d_x * k_line;
+        float pixel_sum = 0;
+        int pixel_point_count = 0;
+        float z1 = -image_length / 2 + d_z *pixel_point;
+        float x = -image_length / 2 + d_x * pixel_line;
         float xg = 0.0014;
 
         // for(int jj=1;jj<=ELE_NO/M;jj++)
@@ -129,29 +129,30 @@ __global__ void kernel(int i, float *image_data, int *point_count, float *trans_
         //  int j=y*ELE_NO/M+jj;
         for (int jj = 0; jj < parallel_emit_sum; jj++)
         {
-            i = i + jj;
-            int j = i - M + y; //接收阵元
-            j = (j + ELE_NO) % ELE_NO;
+                ele_emit_id = ele_emit_id + jj;
+            int ele_receive_id = ele_emit_id - M +id_rec; //接收阵元
+                ele_receive_id = (ele_receive_id + ELE_NO) % ELE_NO;
 
-            float disi = sqrtf((dev_ele_coord_x[i] - x) * (dev_ele_coord_x[i] - x) + (z1 - dev_ele_coord_y[i]) * (z1 - dev_ele_coord_y[i]));
-            float disj = sqrtf((dev_ele_coord_x[j] - x) * (dev_ele_coord_x[j] - x) + (z1 - dev_ele_coord_y[j]) * (z1 - dev_ele_coord_y[j]));
-            float ilength = 112.0 / 1000;
+            float dis_emit = sqrtf((dev_ele_coord_x[ele_emit_id] - x) * (dev_ele_coord_x[ele_emit_id] - x) + (z1 - dev_ele_coord_y[ele_emit_id]) * (z1 - dev_ele_coord_y[ele_emit_id]));
+            float dis_rec = sqrtf((dev_ele_coord_x[ele_receive_id] - x) * (dev_ele_coord_x[ele_receive_id] - x) + (z1 - dev_ele_coord_y[ele_receive_id]) * (z1 - dev_ele_coord_y[ele_receive_id]));
+            float half_length = 112.0 / 1000;
             float imagelength = sqrtf(x * x + z1 * z1);
-            float angle = acosf((ilength * ilength + disi * disi - imagelength * imagelength) / 2 / ilength / disi);
-            if ((disi >= 0.1 * 2 / 3 && (abs(i - j) < 256 || abs(i - j) > 2048 - 256)) || (disi >= 0.1 * 1 / 3 && (abs(i - j) < 200 || abs(i - j) > 2048 - 200)) || (disi >= 0 && (abs(i - j) < 100 || abs(i - j) > 2048 - 100)))
+            float angle = acosf((half_length * half_length + dis_emit * dis_emit - imagelength * imagelength) / 2 / half_length / dis_emit);
+            if ((dis_emit >= 0.1 * 2 / 3 && (abs(ele_emit_id - ele_receive_id) < 256 || abs(ele_emit_id - ele_receive_id) > 2048 - 256)) || (dis_emit >= 0.1 * 1 / 3 && (abs(ele_emit_id - ele_receive_id) < 200 || abs(ele_emit_id - ele_receive_id) > 2048 - 200)) || (dis_emit >= 0 && (abs(ele_emit_id - ele_receive_id) < 100 || abs(ele_emit_id - ele_receive_id) > 2048 - 100)))
             {
-                int num = (disi + disj) / c * fs + 0.5;
+                int sample_num = (dis_emit + dis_rec) / c * fs + 0.5;
 
-                if (((num + middot + (OD - 1 - 1) / 2) > 100) && ((num + middot + (OD - 1 - 1) / 2) <= point_length) && (angle < PI / 9))
+                if (((sample_num + middot + (OD - 2) / 2) > 100) && ((sample_num + middot + (OD - 2) / 2) <= point_length) && (angle < PI / 9))
                 {
-                    u += trans_sdata[(num + middot + (OD - 1 - 1) / 2) * ELE_NO + j] * expf(xg * (num - 1));
+                    pixel_sum += trans_sdata[(sample_num + middot + (OD - 2) / 2) * ELE_NO + ele_receive_id] * expf(xg * (sample_num - 1));
 
-                    point_count_1 += 1;
+                    pixel_point_count += 1;
                 }
             }
         }
-        cache_image[cacheIndex] = u;
-        cache_point[cacheIndex] = point_count_1;
+	//(OD-1-1)/2为滤波群延时
+        cache_image[cacheIndex] = pixel_sum;
+        cache_point[cacheIndex] = pixel_point_count;
 
         __syncthreads();
 
