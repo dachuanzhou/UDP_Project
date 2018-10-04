@@ -36,5 +36,8 @@ int main(int argc, char const *argv[]) {
 
     // study
 
+    free(udp_rcv);
+    free(config);
+
     return 0;
 }
