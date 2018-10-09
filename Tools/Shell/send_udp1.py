@@ -20,9 +20,11 @@ sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)  # UDP
 start = time.monotonic()
 for index in range(1, 614401, 1):
     test = 0
-    for test in range(0, 30, 1):
+    for test in range(0, 38, 1):
         test += 1
     sock.sendto(bytes(MESSAGE, "utf-8"), (UDP_IP, UDP_PORT))
 
 finish = time.monotonic()
 print("Duration ", (finish - start))
+
+input("......Press Enter to Continue......")

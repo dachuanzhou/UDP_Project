@@ -3,7 +3,6 @@
 #include <string>
 
 #include <boost/asio.hpp>
-#include <boost/atomic.hpp>
 #include <boost/bind.hpp>
 #include <boost/shared_ptr.hpp>
 
@@ -57,8 +56,9 @@ void UDP_Socket::start_receive() {
 void UDP_Socket::handle_receive(const boost::system::error_code &error, std::size_t bytes_transferred) {
     if (!error) {
         (*bytes_cnt) += bytes_transferred;
-        // ! 按照协议保存数据
+        // ! 保存所有数据
         // memcpy(data_content + *msg_cnt * 1410l, msg_buffer, VALID_BYTES_LENGTH_PER_PACKAGE);
+        // ! 按照协议保存数据
         memcpy(data_content + *msg_cnt * 1400l, msg_buffer, VALID_BYTES_LENGTH_PER_PACKAGE);
         memcpy(check_content + *msg_cnt * 5, msg_buffer + 1, 2);
         memcpy(check_content + *msg_cnt * 5, msg_buffer + 1405, 3);

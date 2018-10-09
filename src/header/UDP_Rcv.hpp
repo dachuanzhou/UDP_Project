@@ -41,8 +41,7 @@ class UDP_Rcv {
 
 void UDP_Rcv::init_buffer(int ip_count) {
     for (uint8_t index = 0; index < ip_count; index++) {
-        ip_address_list.push_back("172.16." + std::to_string(config->raw_data_ids[index] / 4 + 1) + "." +
-                                  std::to_string(config->raw_data_ids[index] % 4 + 1));
+        ip_address_list.push_back("172.16." + std::to_string(config->raw_data_ids[index]) + ".1");
     }
     data_buffer = (char **)malloc(sizeof(char *) * ip_count +
                                   (long long)ip_count * 1400 * PACKET_SUM_PER_INTERFACE * sizeof(char));
@@ -91,7 +90,7 @@ UDP_Rcv::UDP_Rcv(Config *cfg) {
 
     boost::asio::thread_pool udp_rcv_thread_pool(ip_count);
     // ! index < 1 这里要改成 ip_count 才能监听所有端口，1 为测试用，监听一个端口
-    for (int index = 0; index < 1; index++) {
+    for (int index = 0; index < ip_count; index++) {
         boost::asio::post(udp_rcv_thread_pool, boost::bind(&UDP_Rcv::listening, this, index));
     }
     usleep(40000);
