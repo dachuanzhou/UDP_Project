@@ -19,8 +19,8 @@ __device__ float dev_ele_coord_x[ELE_NO]; // 写到纹理内存里面
 __device__ float dev_ele_coord_y[ELE_NO]; // 写到纹理内存里面
 __device__ float dev_filter_data[OD];     // filter parameter
 
-float image_data[N * N] = {0};
-int image_point_count[N * N] = {0};
+float image_data[PIC_RESOLUTION * PIC_RESOLUTION] = {0};
+int image_point_count[PIC_RESOLUTION * PIC_RESOLUTION] = {0};
 
 // 原始代码，被 filter_func 取代，但保留以备用
 __global__ void kernel3(float *filtered_data, short *data_in_process) {
@@ -91,11 +91,11 @@ __global__ void calc_func(const int ele_emit_id, float *image_data,
     int image_y_dim = gridDim.x;
     int recv_center_id = threadIdx.x; // center of 接收阵元
 
-    __shared__ float cache_image[2 * M];
-    __shared__ int cache_point[2 * M];
+    __shared__ float cache_image[2 * RCV_OFFSET];
+    __shared__ int cache_point[2 * RCV_OFFSET];
     int cacheIndex = threadIdx.x;
 
-    if (image_x_id < N && image_y_id < N && recv_center_id < 2 * M) {
+    if (image_x_id < PIC_RESOLUTION && image_y_id < PIC_RESOLUTION && recv_center_id < 2 * RCV_OFFSET) {
         float sum_image = 0;
         int sum_point = 0;
         float sample_coord_x = -image_width / 2 + coord_step * image_x_id;
@@ -105,7 +105,7 @@ __global__ void calc_func(const int ele_emit_id, float *image_data,
              step_offset += 1) {
             int step = ele_emit_id + step_offset;
             int send_id = step;                         // as send_id
-            int recv_id = send_id - M + recv_center_id; //接收阵元
+            int recv_id = send_id - RCV_OFFSET + recv_center_id; //接收阵元
             recv_id = (recv_id + ELE_NO) % ELE_NO;
             float dis_snd_to_sample =
                 distance(dev_ele_coord_x[send_id], dev_ele_coord_y[send_id],
@@ -179,7 +179,7 @@ __global__ void calc_func(const int ele_emit_id, float *image_data,
 __global__ void add(float *sumdata, int *sumpoint, float *imagedata,
                     int *point_count) {
     int tid = threadIdx.x + blockIdx.x * blockDim.x;
-    while (tid < N * N) {
+    while (tid < PIC_RESOLUTION * PIC_RESOLUTION) {
         sumdata[tid] += imagedata[tid];
         sumpoint[tid] += point_count[tid];
         tid += blockDim.x * gridDim.x;
@@ -209,11 +209,11 @@ cudaError_t precalcWithCuda(short *dev_data_samples_in_process, int ele_emit_id,
 
     // cudaStatus = cudaDeviceSynchronize();
 
-    dim3 gridimage(N, N);
-    // dim3 threads(M);
-    calc_func<<<gridimage, 2 * M>>>(
+    dim3 gridimage(PIC_RESOLUTION, PIC_RESOLUTION);
+    // dim3 threads(RCV_OFFSET);
+    calc_func<<<gridimage, 2 * RCV_OFFSET>>>(
         ele_emit_id, dev_imagedata, dev_pointcount, dev_filtered_data,
-        parallel_emit_sum); //启动一个二维的N*N个block，每个block里面M个thread
+        parallel_emit_sum); //启动一个二维的PIC_RESOLUTION*PIC_RESOLUTION个block，每个block里面RCV_OFFSET个thread
 
     // Check for any errors launching the kernel
     cudaStatus = cudaGetLastError();
@@ -303,12 +303,12 @@ void write_txtfile(std::string output_path) {
         exit(1);
     }
 
-    for (int k = 0; k < N; k++) {
-        for (int j = 0; j < N; j++) {
-            if (image_point_count[k * N + j] == 0)
-                outfile << image_data[k * N + j] << " ";
+    for (int k = 0; k < PIC_RESOLUTION; k++) {
+        for (int j = 0; j < PIC_RESOLUTION; j++) {
+            if (image_point_count[k * PIC_RESOLUTION + j] == 0)
+                outfile << image_data[k * PIC_RESOLUTION + j] << " ";
             else
-                outfile << image_data[k * N + j] / image_point_count[k * N + j]
+                outfile << image_data[k * PIC_RESOLUTION + j] / image_point_count[k * PIC_RESOLUTION + j]
                         << " ";
         }
         outfile << "\r\n";
@@ -417,23 +417,23 @@ int main(int argc, char const *argv[]) {
 
     float *dev_sumdata;
     int *dev_sumpoint;
-    if (cudaMalloc((void **)(&dev_sumdata), N * N * sizeof(float)) !=
+    if (cudaMalloc((void **)(&dev_sumdata), PIC_RESOLUTION * PIC_RESOLUTION * sizeof(float)) !=
         cudaSuccess) {
         cout << "ERROR :: Failed for cudaMalloc dev_sumdata." << endl;
         return -1;
     }
-    if (cudaMalloc((void **)(&dev_sumpoint), N * N * sizeof(int)) !=
+    if (cudaMalloc((void **)(&dev_sumpoint), PIC_RESOLUTION * PIC_RESOLUTION * sizeof(int)) !=
         cudaSuccess) {
         cout << "ERROR :: Failed for cudaMalloc dev_sumpoint." << endl;
         return -1;
     }
     // init dev_sumdata and dev_sumpoint
-    if (cudaMemcpy(dev_sumdata, image_data, N * N * sizeof(float),
+    if (cudaMemcpy(dev_sumdata, image_data, PIC_RESOLUTION * PIC_RESOLUTION * sizeof(float),
                    cudaMemcpyHostToDevice) != cudaSuccess) {
         cout << "ERROR :: Failed for cudaMemcpy dev_sumdata." << endl;
         return -1;
     }
-    if (cudaMemcpy(dev_sumpoint, image_point_count, N * N * sizeof(int),
+    if (cudaMemcpy(dev_sumpoint, image_point_count, PIC_RESOLUTION * PIC_RESOLUTION * sizeof(int),
                    cudaMemcpyHostToDevice) != cudaSuccess) {
         cout << "ERROR :: Failed for cudaMemcpy dev_sumpoint." << endl;
         return -1;
@@ -464,14 +464,14 @@ int main(int argc, char const *argv[]) {
 
     int *dev_pointcount;
 
-    cudaStatus = cudaMalloc((void **)(&dev_imagedata), N * N * sizeof(float));
+    cudaStatus = cudaMalloc((void **)(&dev_imagedata), PIC_RESOLUTION * PIC_RESOLUTION * sizeof(float));
     /* if (cudaStatus != cudaSuccess)
     {
         cout << "imagedata Fail to cudaMalloc on GPU" << endl;
         //goto Error;
         return cudaStatus;
     } */
-    cudaStatus = cudaMalloc((void **)(&dev_pointcount), N * N * sizeof(int));
+    cudaStatus = cudaMalloc((void **)(&dev_pointcount), PIC_RESOLUTION * PIC_RESOLUTION * sizeof(int));
     /* if (cudaStatus != cudaSuccess)
     {
         cout << "pointcount Fail to cudaMalloc on GPU" << endl;
@@ -516,7 +516,7 @@ int main(int argc, char const *argv[]) {
         // cudaError_t cudaStatus = calcWithCuda(
         // i,dev_sumdata,dev_sumpoint,dev_filtered_data);
     }
-    cudaStatus = cudaMemcpy(image_data, dev_sumdata, N * N * sizeof(float),
+    cudaStatus = cudaMemcpy(image_data, dev_sumdata, PIC_RESOLUTION * PIC_RESOLUTION * sizeof(float),
                             cudaMemcpyDeviceToHost);
     /* if (cudaStatus != cudaSuccess)
     {
@@ -526,7 +526,7 @@ int main(int argc, char const *argv[]) {
     } */
 
     cudaStatus = cudaMemcpy(image_point_count, dev_sumpoint,
-                            N * N * sizeof(int), cudaMemcpyDeviceToHost);
+                            PIC_RESOLUTION * PIC_RESOLUTION * sizeof(int), cudaMemcpyDeviceToHost);
     /* if (cudaStatus != cudaSuccess)
     {
         cout << "allpointcount Fail to cudaMemcpy to CPU" << endl;

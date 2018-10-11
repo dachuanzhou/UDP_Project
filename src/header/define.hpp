@@ -11,7 +11,7 @@
 #define IMAGE_WIDTH 0.20 // 成像方形边长
 #define DATA_DIAMETER 0.22
 #define POINT_LENGTH DATA_DIAMETER / SOUND_SPEED *FS + 0.5
-#define COORD_STEP IMAGE_WIDTH / (N - 1)
+#define COORD_STEP IMAGE_WIDTH / (PIC_RESOLUTION - 1)
 #define MIDDOT -160
 #define TGC 0.0014
 #define RADIUS 0.112 // 探头半径
