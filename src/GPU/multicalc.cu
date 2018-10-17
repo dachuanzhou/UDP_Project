@@ -8,9 +8,9 @@
 #include <time.h>
 
 #include "cuda_runtime.h"
-#include "define.hpp"
 #include "device_launch_parameters.h"
 
+#include "../header/define.hpp"
 using namespace std;
 
 int parallel_emit_sum = 1; // 并行处理多个发射节点，优化使用
