@@ -6,5 +6,6 @@ release/*_cpp
 release/*_c
 Document/
 test*
+**/build/*
 *.png
 *.txt
