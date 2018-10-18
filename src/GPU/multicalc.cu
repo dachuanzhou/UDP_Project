@@ -9,9 +9,9 @@ using std::cin;
 using std::cout;
 using std::endl;
 using std::ifstream;
-using std::ofstream;
 using std::ios;
 using std::ios_base;
+using std::ofstream;
 
 #include "cuda_runtime.h"
 #include "device_launch_parameters.h"
@@ -421,9 +421,8 @@ int main(int argc, char const *argv[]) {
   {
     printf("Number of element : %d\n", ele_emit_id);
 
-    // memcpy(&data_samples_in_process[0], &bin_buffer[bin_buffer_index],
-    // length_of_data_in_process); bin_buffer_index = bin_buffer_index +
-    // length_of_data_in_process;
+    // memcpy(&data_samples_in_process[0], &bin_buffer[bin_buffer_index], length_of_data_in_process);
+    // bin_buffer_index = bin_buffer_index + length_of_data_in_process;
 
     // cudaStatus = cudaMemcpy(dev_data_samples_in_process,
     // data_samples_in_process, length_of_data_in_process,
