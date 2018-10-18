@@ -1,10 +1,10 @@
-#include <fstream>
-#include <iostream>
-#include <sstream>
-#include <string>
 #include <time.h>
 #include <cstring>
+#include <fstream>
+#include <iostream>
 #include <random>
+#include <sstream>
+#include <string>
 
 #include "cuda_runtime.h"
 #include "device_launch_parameters.h"
@@ -21,21 +21,6 @@ __device__ float dev_filter_data[OD];        // filter parameter
 
 float image_data[PIC_RESOLUTION * PIC_RESOLUTION] = {0};
 int image_point_count[PIC_RESOLUTION * PIC_RESOLUTION] = {0};
-
-// 滤波函数
-__global__ void filter_func(float *filtered_data, short *data_in_process) {
-  int column_id = blockDim.x * blockIdx.x + threadIdx.x;
-  for (int sample_cnt = 0; sample_cnt < NSAMPLE; sample_cnt++) {
-    for (int j = 0; sample_cnt >= j && j < OD; j++) {
-      filtered_data[(column_id / 2048) * ELE_NO * NSAMPLE +
-                    sample_cnt * ELE_NO + column_id % 2048] +=
-        (dev_filter_data[j] *
-         data_in_process[(sample_cnt - j) * ELE_NO +
-                         (column_id / 2048) * ELE_NO * NSAMPLE +
-                         column_id % 2048]);
-    }
-  }
-}
 
 __global__ void calc_func(const int ele_emit_id, float *image_data,
                           int *point_count, const float *trans_sdata,
@@ -130,16 +115,6 @@ __global__ void calc_func(const int ele_emit_id, float *image_data,
       image_data[pixel_index] = cache_image[0];
       point_count[pixel_index] = cache_point[0];
     }
-  }
-}
-
-__global__ void add(float *sumdata, int *sumpoint, float *imagedata,
-                    int *point_count) {
-  int tid = threadIdx.x + blockIdx.x * blockDim.x;
-  while (tid < PIC_RESOLUTION * PIC_RESOLUTION) {
-    sumdata[tid] += imagedata[tid];
-    sumpoint[tid] += point_count[tid];
-    tid += blockDim.x * gridDim.x;
   }
 }
 
