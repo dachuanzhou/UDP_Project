@@ -5,13 +5,18 @@
 #include <random>
 #include <sstream>
 #include <string>
+using std::cin;
+using std::cout;
+using std::endl;
+using std::ifstream;
+using std::ofstream;
+using std::ios;
+using std::ios_base;
 
 #include "cuda_runtime.h"
 #include "device_launch_parameters.h"
-#include "helper_functions.cuh"
 
 #include "../header/define.hpp"
-using namespace std;
 
 int parallel_emit_sum = 1;    // 并行处理多个发射节点，优化使用
 
@@ -19,6 +24,7 @@ __device__ float dev_ele_coord_x[ELE_NO];    // 写到纹理内存里面
 __device__ float dev_ele_coord_y[ELE_NO];    // 写到纹理内存里面
 __device__ float dev_filter_data[OD];        // filter parameter
 
+#include "helper_functions.cuh"
 float image_data[PIC_RESOLUTION * PIC_RESOLUTION] = {0};
 int image_point_count[PIC_RESOLUTION * PIC_RESOLUTION] = {0};
 

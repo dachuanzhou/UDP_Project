@@ -1,4 +1,16 @@
 #pragma once
+#include <time.h>
+#include <cstring>
+#include <fstream>
+#include <iostream>
+#include <random>
+#include <sstream>
+#include <string>
+#include "cuda_runtime.h"
+#include "device_launch_parameters.h"
+#include "helper_functions.cuh"
+#include "../header/define.hpp"
+
 inline __device__ float distance(float x1, float y1, float x2, float y2) {
   auto dx = x1 - x2;
   auto dy = y1 - y2;
