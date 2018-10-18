@@ -2,13 +2,13 @@
 #include <iostream>
 #include <sstream>
 #include <string>
-// #include <math.h>
 #include <time.h>
 #include <cstring>
 #include <random>
 
 #include "cuda_runtime.h"
 #include "device_launch_parameters.h"
+#include "helper_functions.cuh"
 
 #include "../header/define.hpp"
 using namespace std;
@@ -21,31 +21,6 @@ __device__ float dev_filter_data[OD];        // filter parameter
 
 float image_data[PIC_RESOLUTION * PIC_RESOLUTION] = {0};
 int image_point_count[PIC_RESOLUTION * PIC_RESOLUTION] = {0};
-
-// 原始代码，被 filter_func 取代，但保留以备用
-__global__ void kernel3(float *filtered_data, short *data_in_process) {
-  int column_id = blockDim.x * blockIdx.x + threadIdx.x;
-  short data[NSAMPLE];
-  float filter_temp_data[NSAMPLE];
-
-  if (column_id < gridDim.x * blockDim.x)    // 没有意义，但是不能删除
-  {
-    memset(filter_temp_data, 0, NSAMPLE * sizeof(float));
-    for (int sample_cnt = 0; sample_cnt < NSAMPLE; sample_cnt++) {
-      data[sample_cnt] = data_in_process[sample_cnt * ELE_NO + column_id];
-      for (int j = 0; sample_cnt >= j && j < OD; j++)
-
-      {
-        filter_temp_data[sample_cnt] +=
-          (dev_filter_data[j] * data[sample_cnt - j]);
-      }
-    }
-
-    for (int i = 0; i < NSAMPLE; i++) {
-      filtered_data[i * ELE_NO + column_id] = filter_temp_data[i];
-    }
-  }
-}
 
 // 滤波函数
 __global__ void filter_func(float *filtered_data, short *data_in_process) {
@@ -60,18 +35,6 @@ __global__ void filter_func(float *filtered_data, short *data_in_process) {
                          column_id % 2048]);
     }
   }
-}
-
-inline __device__ float distance(float x1, float y1, float x2, float y2) {
-  auto dx = x1 - x2;
-  auto dy = y1 - y2;
-  return sqrtf(dx * dx + dy * dy);
-}
-
-bool __device__ __host__ is_close(int delta, int range) {
-  int abs_delta = abs(delta);
-  return (abs_delta < range || range > 2048 - range);
-  // return (delta + range + 2047) % 2048 < 2 * range - 1;
 }
 
 __global__ void calc_func(const int ele_emit_id, float *image_data,
@@ -128,9 +91,9 @@ __global__ void calc_func(const int ele_emit_id, float *image_data,
 
       if (is_valid) {
         int num = (dis_snd_to_sample + disj) / sound_speed * fs + 0.5;
+        int magic = (num + middot + (OD - 1 - 1) / 2);
 
-        if (((num + middot + (OD - 1 - 1) / 2) > 100) &&
-            ((num + middot + (OD - 1 - 1) / 2) <= point_length)) {
+        if ((magic > 100) && (magic <= point_length)) {
           // 2 * R * dis_snd_to_sample * cosTheta = R^2 +
           // dis_snd_to_sample^2 - |(x, z)|^2
           float angle =
@@ -138,11 +101,9 @@ __global__ void calc_func(const int ele_emit_id, float *image_data,
                    imagelength * imagelength) /
                   2 / radius / dis_snd_to_sample);
           if ((angle < PI / 9)) {
-            sum_image +=
-              trans_sdata[(num + middot + (OD - 1 - 1) / 2) * ELE_NO + recv_id +
-                          step_offset * ELE_NO * NSAMPLE] *
-              expf(tgc * (num - 1));
-
+            sum_image += trans_sdata[magic * ELE_NO + recv_id +
+                                     step_offset * ELE_NO * NSAMPLE] *
+                         expf(tgc * (num - 1));
             sum_point += 1;
           }
         }

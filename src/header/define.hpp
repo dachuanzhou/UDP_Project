@@ -1,3 +1,4 @@
+#pragma once
 #ifndef __CONST_VALUE__
 #define __CONST_VALUE__
 #define PI 3.14159265358979323846
