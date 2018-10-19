@@ -17,7 +17,7 @@ using std::ofstream;
 #include "device_launch_parameters.h"
 
 #include "../header/define.hpp"
-
+constexpr int DEBUG_SAMPLE_RATE_REV = 32;
 int parallel_emit_sum = 1;    // 并行处理多个发射节点，优化使用
 
 __device__ float dev_ele_coord_x[ELE_NO];    // 写到纹理内存里面
@@ -51,6 +51,8 @@ __global__ void calc_func(const int ele_emit_id, float *image_data,
 
   if (image_x_id < PIC_RESOLUTION && image_y_id < PIC_RESOLUTION &&
       recv_center_id < 2 * RCV_OFFSET) {
+    // the above condition is bullshit
+
     float sum_image = 0;
     int sum_point = 0;
     float sample_coord_x = -image_width / 2 + coord_step * image_x_id;
@@ -73,12 +75,8 @@ __global__ void calc_func(const int ele_emit_id, float *image_data,
       // put dis_snd_to_sample constraint onto for;
       // and since
       auto diff = send_id - recv_id;
-      /* bool is_valid = (dis_snd_to_sample >= 0.1 * 2 / 3 &&
-               is_close(diff, 256)) || (dis_snd_to_sample >= 0.1 * 1 / 3 &&
-               is_close(diff, 200)) || (dis_snd_to_sample >= 0.1 * 0 / 3 &&
-               is_close(diff, 100)); */
       float compare_value = 244 * sqrtf(10 * dis_snd_to_sample);
-      bool is_valid = (diff < compare_value) || (diff > (2048 - compare_value));
+      bool is_valid = is_close(diff, compare_value);
 
       if (is_valid) {
         int num = (dis_snd_to_sample + disj) / sound_speed * fs + 0.5;
@@ -310,7 +308,7 @@ int main(int argc, char const *argv[]) {
     cout << " the bin file open fail" << endl;
     return -1;
   }
-  long long int filesize = file_read.tellg();
+  long long int filesize = file_read.tellg() / DEBUG_SAMPLE_RATE_REV;
   file_read.seekg(0, file_read.beg);
   // 为 bin_buffer 申请空间，并把 filepath 的数据载入内存
   char *bin_buffer = (char *)std::malloc(filesize);
@@ -319,12 +317,12 @@ int main(int argc, char const *argv[]) {
     return -1;
   }
   file_read.read(bin_buffer, filesize);
-  if (file_read.peek() == EOF) {
-    file_read.close();
-  } else {
-    std::cout << "ERROR :: Read bin file error." << std::endl;
-    exit(-1);
-  }
+  // if (file_read.peek() == EOF) {
+  //   file_read.close();
+  // } else {
+  //   std::cout << "ERROR :: Read bin file error." << std::endl;
+  //   exit(-1);
+  // }
   over_read = time(NULL);
   cout << "Reading time is : " << difftime(over_read, start_read) << "s!"
        << endl;
@@ -415,7 +413,7 @@ int main(int argc, char const *argv[]) {
     } */
 
   long long bin_buffer_index = 0;
-  for (int ele_emit_id = 0; ele_emit_id < ELE_NO;
+  for (int ele_emit_id = 0; ele_emit_id < ELE_NO / DEBUG_SAMPLE_RATE_REV;
        ele_emit_id += parallel_emit_sum)
   // for (i=1;i<=1;i++)
   {
