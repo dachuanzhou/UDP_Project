@@ -414,10 +414,8 @@ int main(int argc, char const *argv[]) {
 
   long long bin_buffer_index = 0;
   for (int ele_emit_id = 0; ele_emit_id < ELE_NO / DEBUG_SAMPLE_RATE_REV;
-       ele_emit_id += parallel_emit_sum)
-  // for (i=1;i<=1;i++)
-  {
-    printf("Number of element : %d\n", ele_emit_id);
+       ele_emit_id += parallel_emit_sum) {
+    fprintf(stderr, "Number of element : %d\n", ele_emit_id);
 
     // memcpy(&data_samples_in_process[0], &bin_buffer[bin_buffer_index], length_of_data_in_process);
     // bin_buffer_index = bin_buffer_index + length_of_data_in_process;
