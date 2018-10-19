@@ -64,33 +64,33 @@ __global__ void calc_func(const int ele_emit_id, float *image_data,
       int send_id = step;                                     // as send_id
       int recv_id = send_id - RCV_OFFSET + recv_center_id;    //接收阵元
       recv_id = (recv_id + ELE_NO) % ELE_NO;
-      float dis_snd_to_sample =
+      float dis_snd =
         distance(dev_ele_coord_x[send_id], dev_ele_coord_y[send_id],
                  sample_coord_x, sample_coord_y);
-      float disj = distance(dev_ele_coord_x[recv_id], dev_ele_coord_y[recv_id],
-                            sample_coord_x, sample_coord_y);
-      float imagelength = sqrtf(sample_coord_x * sample_coord_x +
-                                sample_coord_y * sample_coord_y);
+      float dis_recv =
+        distance(dev_ele_coord_x[recv_id], dev_ele_coord_y[recv_id],
+                 sample_coord_x, sample_coord_y);
+      float dis_origin = sqrtf(sample_coord_x * sample_coord_x +
+                               sample_coord_y * sample_coord_y);
 
-      // put dis_snd_to_sample constraint onto for;
+      // put dis_snd constraint onto for;
       // and since
       auto diff = send_id - recv_id;
-      float compare_value = 244 * sqrtf(10 * dis_snd_to_sample);
+      float compare_value = 244 * sqrtf(10 * dis_snd);
       bool is_valid = is_close(diff, compare_value);
 
       if (is_valid) {
-        int num = (dis_snd_to_sample + disj) / sound_speed * fs + 0.5;
+        int num = (dis_snd + dis_recv) / sound_speed * fs + 0.5;
         int magic = (num + middot + (OD - 1 - 1) / 2);
 
         if ((magic > 100) && (magic <= point_length)) {
-          // 2 * R * dis_snd_to_sample * cosTheta = R^2 +
-          // dis_snd_to_sample^2 - |(x, z)|^2
-          float angle =
-            acosf((radius * radius + dis_snd_to_sample * dis_snd_to_sample -
-                   imagelength * imagelength) /
-                  2 / radius / dis_snd_to_sample);
+          // 2 * R * dis_snd * cosTheta
+          // = R^2 + dis_snd^2 - |(x, y)|^2
+          float angle = acosf(
+            (radius * radius + dis_snd * dis_snd - dis_origin * dis_origin) /
+            2 / radius / dis_snd);
           if ((angle < PI / 9)) {
-            sum_image += trans_sdata[magic * ELE_NO + recv_id +
+            sum_image += trans_sdata[recv_id + magic * ELE_NO +
                                      step_offset * ELE_NO * NSAMPLE] *
                          expf(tgc * (num - 1));
             sum_point += 1;
