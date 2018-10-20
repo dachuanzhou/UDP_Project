@@ -73,8 +73,8 @@ __global__ void fast_calc_kernel(      //
       // TODO: use some trick to fast kill unnecessary points
       // fuck *= 1.2 + pixel_coord_x - pixel_coord_y;
       const int recv_id = recv_id_iter & (2048 - 1);
-      const float recv_coord_x = dev_ele_coord_x[recv_id_iter];
-      const float recv_coord_y = dev_ele_coord_y[recv_id_iter];
+      const float recv_coord_x = dev_ele_coord_x[recv_id];
+      const float recv_coord_y = dev_ele_coord_y[recv_id];
       const float dis_recv =
           distance(pixel_coord_x, pixel_coord_y, recv_coord_x, recv_coord_y);
       const int waves = (dis_snd + dis_recv) / SOUND_SPEED * FS + 0.5;
