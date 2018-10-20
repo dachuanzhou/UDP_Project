@@ -28,8 +28,6 @@ int bin_search(F f, int beg, int end) {
   return beg;
 }
 
-
-
 // grid param: <pixel_group_idy, pixel_group_idx, sender_offset>
 // block param: <pixel_offset_idy, pixel_offset_idx>
 // for loop size is roughly equal for each block, never panic
@@ -48,8 +46,8 @@ __global__ void fast_calc_kernel(      //
   // pixels
   const int pixel_offset_x = threadIdx.y;
   const int pixel_offset_y = threadIdx.x;
-  const int pixel_idx = blockIdx.y * blockDim.y + threadIdx.y;
-  const int pixel_idy = blockIdx.x * blockDim.x + threadIdx.x;
+  const int pixel_idx = pixel_offset_x + blockIdx.y * blockDim.y;
+  const int pixel_idy = pixel_offset_y + blockIdx.x * blockDim.x;
   // if(pixel_idx >= 2046 && pixel_idy >= 2046){
   //   printf("%d-%d-%d ", pixel_idx, pixel_idy, sender_id);
   // }
@@ -64,7 +62,8 @@ __global__ void fast_calc_kernel(      //
 
   if (valid_flag) {
     // float fuck = 1.0;
-    const int recv_region = 244 * sqrtf(10 * dis_snd);
+    
+    const int recv_region = min((int)(244 * sqrtf(10 * dis_snd)), RCV_OFFSET);
     const int beg_recv_id = sender_id - recv_region + 1;
     const int end_recv_id = sender_id + recv_region;
     float sum_image_data = 0.0;
@@ -73,17 +72,17 @@ __global__ void fast_calc_kernel(      //
          ++recv_id_iter) {
       // TODO: use some trick to fast kill unnecessary points
       // fuck *= 1.2 + pixel_coord_x - pixel_coord_y;
-      const int recv_id = (recv_id_iter + 2048) % 2048;
+      const int recv_id = recv_id_iter & (2048 - 1);
       const float recv_coord_x = dev_ele_coord_x[recv_id_iter];
       const float recv_coord_y = dev_ele_coord_y[recv_id_iter];
       const float dis_recv =
           distance(pixel_coord_x, pixel_coord_y, recv_coord_x, recv_coord_y);
-      const int waves = round((dis_snd + dis_recv) / SOUND_SPEED * FS);
+      const int waves = (dis_snd + dis_recv) / SOUND_SPEED * FS + 0.5;
       const int magic = waves + MIDDOT + (OD - 1 - 1) / 2;
       if (magic > 100 && magic <= POINT_LENGTH) {
         const float data = trans_data[recv_id + magic * ELE_NO +
-                                       sender_offset * ELE_NO * NSAMPLE];
-        const float image = data * expf(TGC*(waves - 1));
+                                      sender_offset * ELE_NO * NSAMPLE];
+        const float image = data * expf(TGC * (waves - 1));
         sum_image_data += image;
         sum_count_data++;
       }
@@ -103,13 +102,6 @@ void fast_calc(                        //
     float* image_data,    //
     int* point_count      //
 ) {
-  const float total_max_length =
-      (double)(POINT_LENGTH - MIDDOT - (OD - 1 - 1) / 2) / FS * SOUND_SPEED;
-
-  const float total_min_length =
-      (double)(100 - MIDDOT - (OD - 1 - 1) / 2) / FS * SOUND_SPEED;
-  // float sender_x = dev_ele_coord_x[sender_id];
-  // float sender_y = dev_ele_coord_y[sender_id];
   dim3 grid_param(64, 64, sender_id_group_size);
   dim3 block_param(32, 32, 1);
   fast_calc_kernel<<<grid_param, block_param>>>(    //
