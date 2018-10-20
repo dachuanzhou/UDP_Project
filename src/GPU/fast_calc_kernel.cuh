@@ -70,7 +70,7 @@ __global__ void fast_calc_kernel(      //
   // pixels
   const int pixel_offset_x = threadIdx.y;
   const int pixel_offset_y = threadIdx.x;
-  const int pixel_idx = blockIdx.y * blockDim.y + threadIdx.x;
+  const int pixel_idx = blockIdx.y * blockDim.y + threadIdx.y;
   const int pixel_idy = blockIdx.x * blockDim.x + threadIdx.x;
 
   const float pixel_coord_x = -IMAGE_WIDTH / 2 + COORD_STEP * pixel_idx;
@@ -100,8 +100,9 @@ __global__ void fast_calc_kernel(      //
       const int waves = round((dis_snd + dis_recv) / SOUND_SPEED * FS);
       const int magic = waves + MIDDOT + (OD - 1 - 1) / 2;
       if (magic > 100 && magic <= POINT_LENGTH) {
-        const float image = trans_data[recv_id + magic * ELE_NO +
+        const float data = trans_data[recv_id + magic * ELE_NO +
                                        sender_offset * ELE_NO * NSAMPLE];
+        const float image = data * expf(TGC*(waves - 1));
         sum_image_data += image;
         sum_count_data++;
       }
@@ -109,7 +110,7 @@ __global__ void fast_calc_kernel(      //
     }
     int overall_offset = pixel_idx * PIC_RESOLUTION + pixel_idy;
     atomicAdd(global_image_data + overall_offset, sum_image_data);
-    atomicAdd(global_image_data + overall_offset, sum_count_data);
+    atomicAdd(global_count_data + overall_offset, sum_count_data);
     // count_data[] += 1;
   }
 }
