@@ -62,11 +62,11 @@ __global__ void fast_calc_kernel(      //
 
   if (valid_flag) {
     // float fuck = 1.0;
-    
+
     const int recv_region = min((int)(244 * sqrtf(10 * dis_snd)), RCV_OFFSET);
     const int beg_recv_id = sender_id - recv_region + 1;
     const int end_recv_id = sender_id + recv_region;
-    float sum_image_data = 0.0;
+    double sum_image_data = 0.0;
     int sum_count_data = 0;
     for (int recv_id_iter = beg_recv_id; recv_id_iter < end_recv_id;
          ++recv_id_iter) {
@@ -80,16 +80,16 @@ __global__ void fast_calc_kernel(      //
       const int waves = (dis_snd + dis_recv) / SOUND_SPEED * FS + 0.5;
       const int magic = waves + MIDDOT + (OD - 1 - 1) / 2;
       if (magic > 100 && magic <= POINT_LENGTH) {
-        const float data = trans_data[recv_id + magic * ELE_NO +
-                                      sender_offset * ELE_NO * NSAMPLE];
-        const float image = data * expf(TGC * (waves - 1));
+        const double image = trans_data[recv_id + magic * ELE_NO +
+                                        sender_offset * ELE_NO * NSAMPLE] *
+                             expf(TGC * (waves - 1));
         sum_image_data += image;
         sum_count_data++;
       }
       // int waves = (dis_snd + dis_recv) / SOUND_SPEED * FS + 0.5;
     }
     int overall_offset = pixel_idx * PIC_RESOLUTION + pixel_idy;
-    atomicAdd(global_image_data + overall_offset, sum_image_data);
+    atomicAdd(global_image_data + overall_offset, (float)sum_image_data);
     atomicAdd(global_count_data + overall_offset, sum_count_data);
     // count_data[] += 1;
   }
