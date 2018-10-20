@@ -76,12 +76,12 @@ __global__ void calc_func(const int ele_emit_id, float *image_data,
       // put dis_snd constraint onto for;
       // and since
       auto diff = send_id - recv_id;
-      float compare_value = 244 * sqrtf(10 * dis_snd);
-      bool is_valid = is_close(diff, compare_value);
+      float recv_region = 244 * sqrtf(10 * dis_snd);
+      bool is_valid = is_close(diff, recv_region);
 
       if (is_valid) {
-        int num = (dis_snd + dis_recv) / sound_speed * fs + 0.5;
-        int magic = (num + middot + (OD - 1 - 1) / 2);
+        int waves = (dis_snd + dis_recv) / sound_speed * fs + 0.5;
+        int magic = (waves + middot + (OD - 1 - 1) / 2);
 
         if ((magic > 100) && (magic <= point_length)) {
           // 2 * R * dis_snd * cosTheta
@@ -92,7 +92,7 @@ __global__ void calc_func(const int ele_emit_id, float *image_data,
           if ((angle < PI / 9)) {
             sum_image += trans_sdata[recv_id + magic * ELE_NO +
                                      step_offset * ELE_NO * NSAMPLE] *
-                         expf(tgc * (num - 1));
+                         expf(tgc * (waves - 1));
             sum_point += 1;
           }
         }
@@ -415,7 +415,7 @@ int main(int argc, char const *argv[]) {
   long long bin_buffer_index = 0;
   for (int ele_emit_id = 0; ele_emit_id < ELE_NO / DEBUG_SAMPLE_RATE_REV;
        ele_emit_id += parallel_emit_sum) {
-    fprintf(stderr, "Number of element : %d\n", ele_emit_id);
+    fprintf(stderr, "wavesber of element : %d\n", ele_emit_id);
 
     // memcpy(&data_samples_in_process[0], &bin_buffer[bin_buffer_index], length_of_data_in_process);
     // bin_buffer_index = bin_buffer_index + length_of_data_in_process;

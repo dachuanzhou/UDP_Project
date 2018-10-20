@@ -1,3 +1,4 @@
+#include <thrust/device_vector.h>
 #include <algorithm>
 #include <cassert>
 #include <vector>
@@ -9,6 +10,8 @@
 __device__ float dev_ele_coord_x[ELE_NO];    // 写到纹理内存里面
 __device__ float dev_ele_coord_y[ELE_NO];    // 写到纹理内存里面
 __device__ float dev_filter_data[OD];        // filter parameter
+
+#include "helper_functions.cuh"
 
 template <typename F>
 int bin_search(F f, int beg, int end) {
@@ -32,25 +35,54 @@ int bin_search(F f, int beg, int end) {
 // grid param: <pixel_group_idx, pixel_group_idy, sender_offset>
 // block param: <pixel_offset_idx, pixel_offset_idy>
 // for loop size is roughly equal for each block, never panic
-__global__ fast_calc_kernel(           //
+__global__ void fast_calc_kernel(      //
     const float* trans_data,           //
     const int sender_id_group_base,    //
     float* image_data,                 //
     int* point_count                   //
 ) {
+  // senders
   const int sender_id = gridDim.z + sender_id_group_base;
   const float sender_coord_x = dev_ele_coord_x[sender_id];
   const float sender_coord_y = dev_ele_coord_y[sender_id];
 
+  // pixels
   const int pixel_offset_x = threadIdx.x;
   const int pixel_offset_y = threadIdx.y;
   const int pixel_idx = gridDim.x * blockIdx.x + threadIdx.x;
   const int pixel_idy = gridDim.y * blockIdx.y + threadIdx.x;
-  const float pixel_coord_x = -image_width / 2 + coord_step * image_x_id;
-  const float pixel_coord_y = -image_width / 2 + coord_step * image_y_id;
+  const float pixel_coord_x = -IMAGE_WIDTH / 2 + COORD_STEP * pixel_idx;
+  const float pixel_coord_y = -IMAGE_WIDTH / 2 + COORD_STEP * pixel_idy;
 
-  const 
+  const float dis_snd = distance(pixel_coord_x, pixel_coord_y,    //
+                                 sender_coord_x, sender_coord_y);
+  const int recv_region = 244 * sqrtf(10 * dis_snd);
 
+  int beg_recv_id = sender_id - recv_region + 1;
+  int end_recv_id = sender_id + recv_region;
+  float fuck = 1.0;
+  // TODO: try to skip most fucking calculation here
+  //  TODO: use angle wisely
+  // {
+  //   float r_base = -sender_coord_x;
+  //   float im_base = -sender_coord_y;
+  //   float r_target = (pixel_coord_x-sender_coord_x);
+  //   float im_target = (pixel_coord_y-sender_coord_y);
+  //   // complex calc: ~base * target
+  //   float r_compute = r_base * r_target + im_base * im_target;
+  //   float im_compute = r_base * im_target - im_base * r_target;
+  //   float tanTheta = im_compute / r_compute;
+  //   if(r_compute <= 0 || )
+  // }
+  //  TODO: set up distance limit wisely
+
+  for (int recv_id = beg_recv_id; recv_id < end_recv_id; ++recv_id) {
+    fuck *= 1.2 + pixel_coord_x - pixel_coord_y;
+    // use some trick to fast kill unnecessary points
+    // float dis_recv = distance(pixel_coord_x, pixel_coord_y, recv_coord_x, recv_coord_y);
+    // int waves = (dis_snd + dis_recv) / SOUND_SPEED * FS + 0.5;
+  }
+  dev_filter_data[0] += fuck;
 }
 
 void fast_calc(                        //
@@ -73,10 +105,22 @@ void fast_calc(                        //
       trans_data,                                   //
       sender_id_group_base,                         //
       image_data,                                   //
-      point_count,                                  //
+      point_count                                   //
   );
 }
 
 int main() {
+  // auto dummy = ::cudaMalloc(2048 * 2048 * sizeof(float));
+  // auto dummy_int = (int*)::cudaMalloc(2048 * 2048 * sizeof(float));
+  // auto dummy_float = (float*)::cudaMalloc(2048 * 2048 * sizeof(int));
+  thrust::device_vector<float> in_float(2048 * 2048);
+  thrust::device_vector<int> out_int(2048 * 2048);
+  thrust::device_vector<float> out_float(2048 * 2048);
+
+  fast_calc(thrust::raw_pointer_cast(in_float.data()),     //
+            0, 32,                                         //
+            thrust::raw_pointer_cast(out_float.data()),    //
+            thrust::raw_pointer_cast(out_int.data())       //
+  );
   return 0;
 }
