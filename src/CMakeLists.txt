@@ -6,7 +6,7 @@ set(data_dir ${CMAKE_CURRENT_SOURCE_DIR}/../../data/)
 add_test(
   NAME Gen_sample_txt
   COMMAND fast_calc 
-    1
+    16
     ${data_dir}/b_64.filter 
     ${data_dir}/decode_data.bin 
     ${CMAKE_CURRENT_BINARY_DIR}/sample.txt
