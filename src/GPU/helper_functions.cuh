@@ -10,6 +10,10 @@
 #include "device_launch_parameters.h"
 #include "helper_functions.cuh"
 #include "../header/define.hpp"
+// extern __device__ float dev_ele_coord_x[ELE_NO];    // 写到纹理内存里面
+// extern __device__ float dev_ele_coord_y[ELE_NO];    // 写到纹理内存里面
+// extern __device__ float dev_filter_data[OD];        // filter parameter
+
 
 inline __host__ __device__ float distance(float x1, float y1, float x2, float y2) {
   auto dx = x1 - x2;
@@ -49,7 +53,7 @@ __global__ void add(float *sumdata, int *sumpoint, float *imagedata,
 }
 
 void get_ele_position(float *ele_coord_x, float *ele_coord_y) {
-  float rfocus = (float)112 / 1000;
+  float rfocus = RADIUS;
   float ele_angle = (2 * PI * 43.4695 / (256 - 1)) / 360;    //阵元间隔角度
   float first_one = 2 * PI * (45 - 43.4695) / 360;    //第一个阵元角度
 

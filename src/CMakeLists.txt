@@ -5,7 +5,7 @@ enable_testing()
 set(data_dir ${CMAKE_CURRENT_SOURCE_DIR}/../../data/)
 add_test(
   NAME Gen_sample_txt
-  COMMAND multicalc 
+  COMMAND fast_calc 
     1
     ${data_dir}/b_64.filter 
     ${data_dir}/decode_data.bin 
