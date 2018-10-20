@@ -66,7 +66,7 @@ __global__ void fast_calc_kernel(      //
     const int recv_region = min((int)(244 * sqrtf(10 * dis_snd)), RCV_OFFSET);
     const int beg_recv_id = sender_id - recv_region + 1;
     const int end_recv_id = sender_id + recv_region;
-    double sum_image_data = 0.0;
+    float sum_image_data = 0.0;
     int sum_count_data = 0;
     for (int recv_id_iter = beg_recv_id; recv_id_iter < end_recv_id;
          ++recv_id_iter) {
@@ -80,7 +80,7 @@ __global__ void fast_calc_kernel(      //
       const int waves = (dis_snd + dis_recv) / SOUND_SPEED * FS + 0.5;
       const int magic = waves + MIDDOT + (OD - 1 - 1) / 2;
       if (magic > 100 && magic <= POINT_LENGTH) {
-        const double image = trans_data[recv_id + magic * ELE_NO +
+        const float image = trans_data[recv_id + magic * ELE_NO +
                                         sender_offset * ELE_NO * NSAMPLE] *
                              expf(TGC * (waves - 1));
         sum_image_data += image;
