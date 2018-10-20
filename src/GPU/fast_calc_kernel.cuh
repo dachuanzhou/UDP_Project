@@ -46,8 +46,10 @@ __device__ bool check_validity(    //
   float r_compute = r_base * r_target + im_base * im_target;
   float im_compute = r_base * im_target - im_base * r_target;
   bool angle = (r_compute >= 0 && (abs(im_compute / r_compute) < tanpi_9));
-  bool range = r_compute < RADIUS * RADIUS;
-  return angle && range;
+  // printf("[%f-%f-%f-%f]", r_compute, im_compute);
+  // bool range = r_compute < RADIUS * RADIUS;
+  // return angle && range ;
+  return angle;
 }
 
 // grid param: <pixel_group_idy, pixel_group_idx, sender_offset>
@@ -68,8 +70,9 @@ __global__ void fast_calc_kernel(      //
   // pixels
   const int pixel_offset_x = threadIdx.y;
   const int pixel_offset_y = threadIdx.x;
-  const int pixel_idx = gridDim.y * blockIdx.y + threadIdx.x;
-  const int pixel_idy = gridDim.x * blockIdx.x + threadIdx.x;
+  const int pixel_idx = blockIdx.y * blockDim.y + threadIdx.x;
+  const int pixel_idy = blockIdx.x * blockDim.x + threadIdx.x;
+
   const float pixel_coord_x = -IMAGE_WIDTH / 2 + COORD_STEP * pixel_idx;
   const float pixel_coord_y = -IMAGE_WIDTH / 2 + COORD_STEP * pixel_idy;
 
