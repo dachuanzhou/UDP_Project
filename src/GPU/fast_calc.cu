@@ -45,6 +45,7 @@ __global__ void fast_calc_kernel(      //
   const int sender_id = gridDim.z + sender_id_group_base;
   const float sender_coord_x = dev_ele_coord_x[sender_id];
   const float sender_coord_y = dev_ele_coord_y[sender_id];
+  const float tanpi_9 = tanf(PI / 9);
 
   // pixels
   const int pixel_offset_x = threadIdx.x;
@@ -61,28 +62,29 @@ __global__ void fast_calc_kernel(      //
   int beg_recv_id = sender_id - recv_region + 1;
   int end_recv_id = sender_id + recv_region;
   float fuck = 1.0;
+  bool valid_flag = true;
   // TODO: try to skip most fucking calculation here
   //  TODO: use angle wisely
-  // {
-  //   float r_base = -sender_coord_x;
-  //   float im_base = -sender_coord_y;
-  //   float r_target = (pixel_coord_x-sender_coord_x);
-  //   float im_target = (pixel_coord_y-sender_coord_y);
-  //   // complex calc: ~base * target
-  //   float r_compute = r_base * r_target + im_base * im_target;
-  //   float im_compute = r_base * im_target - im_base * r_target;
-  //   float tanTheta = im_compute / r_compute;
-  //   if(r_compute <= 0 || )
-  // }
-  //  TODO: set up distance limit wisely
-
-  for (int recv_id = beg_recv_id; recv_id < end_recv_id; ++recv_id) {
-    fuck *= 1.2 + pixel_coord_x - pixel_coord_y;
-    // use some trick to fast kill unnecessary points
-    // float dis_recv = distance(pixel_coord_x, pixel_coord_y, recv_coord_x, recv_coord_y);
-    // int waves = (dis_snd + dis_recv) / SOUND_SPEED * FS + 0.5;
+  {
+    float r_base = -sender_coord_x;
+    float im_base = -sender_coord_y;
+    float r_target = (pixel_coord_x - sender_coord_x);
+    float im_target = (pixel_coord_y - sender_coord_y);
+    // complex calc: ~base * target
+    float r_compute = r_base * r_target + im_base * im_target;
+    float im_compute = r_base * im_target - im_base * r_target;
+    valid_flag = (r_compute >= 0 && ((im_compute / r_compute) < tanpi_9));
   }
-  dev_filter_data[0] += fuck;
+  if (valid_flag) {
+    //  TODO: set up distance limit wisely
+    for (int recv_id = beg_recv_id; recv_id < end_recv_id; ++recv_id) {
+      fuck *= 1.2 + pixel_coord_x - pixel_coord_y;
+      // use some trick to fast kill unnecessary points
+      // float dis_recv = distance(pixel_coord_x, pixel_coord_y, recv_coord_x, recv_coord_y);
+      // int waves = (dis_snd + dis_recv) / SOUND_SPEED * FS + 0.5;
+    }
+    dev_filter_data[0] += fuck;
+  }
 }
 
 void fast_calc(                        //
@@ -116,6 +118,7 @@ int main() {
   thrust::device_vector<float> in_float(2048 * 2048);
   thrust::device_vector<int> out_int(2048 * 2048);
   thrust::device_vector<float> out_float(2048 * 2048);
+  get_ele_position(dev_ele_coord_x, dev_ele_coord_y);
 
   fast_calc(thrust::raw_pointer_cast(in_float.data()),     //
             0, 32,                                         //

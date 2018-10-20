@@ -47,3 +47,50 @@ __global__ void add(float *sumdata, int *sumpoint, float *imagedata,
     tid += blockDim.x * gridDim.x;
   }
 }
+
+void get_ele_position(float *ele_coord_x, float *ele_coord_y) {
+  float rfocus = (float)112 / 1000;
+  float ele_angle = (2 * PI * 43.4695 / (256 - 1)) / 360;    //阵元间隔角度
+  float first_one = 2 * PI * (45 - 43.4695) / 360;    //第一个阵元角度
+
+  for (int i = 0; i < 256; i++) {
+    ele_coord_x[i] = rfocus * cos(first_one + i * ele_angle);
+    ele_coord_y[i] = -rfocus * sin(first_one + i * ele_angle);
+  }
+  for (int i = 256; i < 512; i++) {
+    ele_coord_x[i] = rfocus * cos(first_one + (i - 256) * ele_angle + PI / 4);
+    ele_coord_y[i] = -rfocus * sin(first_one + (i - 256) * ele_angle + PI / 4);
+  }
+  for (int i = 512; i < 768; i++) {
+    ele_coord_x[i] = rfocus * cos(first_one + (i - 512) * ele_angle + PI / 2);
+    ele_coord_y[i] = -rfocus * sin(first_one + (i - 512) * ele_angle + PI / 2);
+  }
+  for (int i = 768; i < 1024; i++) {
+    ele_coord_x[i] =
+      rfocus * cos(first_one + (i - 768) * ele_angle + 3 * PI / 4);
+    ele_coord_y[i] =
+      -rfocus * sin(first_one + (i - 768) * ele_angle + 3 * PI / 4);
+  }
+  for (int i = 1024; i < 1280; i++) {
+    ele_coord_x[i] = rfocus * cos(first_one + (i - 1024) * ele_angle + PI);
+    ele_coord_y[i] = -rfocus * sin(first_one + (i - 1024) * ele_angle + PI);
+  }
+  for (int i = 1280; i < 1536; i++) {
+    ele_coord_x[i] =
+      rfocus * cos(first_one + (i - 1280) * ele_angle + 5 * PI / 4);
+    ele_coord_y[i] =
+      -rfocus * sin(first_one + (i - 1280) * ele_angle + 5 * PI / 4);
+  }
+  for (int i = 1536; i < 1792; i++) {
+    ele_coord_x[i] =
+      rfocus * cos(first_one + (i - 1536) * ele_angle + 3 * PI / 2);
+    ele_coord_y[i] =
+      -rfocus * sin(first_one + (i - 1536) * ele_angle + 3 * PI / 2);
+  }
+  for (int i = 1792; i < 2048; i++) {
+    ele_coord_x[i] =
+      rfocus * cos(first_one + (i - 1792) * ele_angle + 7 * PI / 4);
+    ele_coord_y[i] =
+      -rfocus * sin(first_one + (i - 1792) * ele_angle + 7 * PI / 4);
+  }
+}
