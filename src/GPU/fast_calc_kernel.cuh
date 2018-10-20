@@ -40,8 +40,8 @@ __global__ void fast_calc_kernel(      //
     int* global_count_data             //
 ) {
   // senders
-  const int sender_offset = gridDim.z;
-  const int sender_id = gridDim.z + sender_id_group_base;
+  const int sender_offset = blockIdx.z;
+  const int sender_id = sender_offset + sender_id_group_base;
   const float sender_coord_x = dev_ele_coord_x[sender_id];
   const float sender_coord_y = dev_ele_coord_y[sender_id];
 
@@ -50,6 +50,9 @@ __global__ void fast_calc_kernel(      //
   const int pixel_offset_y = threadIdx.x;
   const int pixel_idx = blockIdx.y * blockDim.y + threadIdx.y;
   const int pixel_idy = blockIdx.x * blockDim.x + threadIdx.x;
+  if(pixel_idx >= 2046 && pixel_idy >= 2046){
+    printf("%d-%d-%d ", pixel_idx, pixel_idy, sender_id);
+  }
 
   const float pixel_coord_x = -IMAGE_WIDTH / 2 + COORD_STEP * pixel_idx;
   const float pixel_coord_y = -IMAGE_WIDTH / 2 + COORD_STEP * pixel_idy;
