@@ -56,10 +56,11 @@ __device__ bool check_validity(    //
 __global__ void fast_calc_kernel(      //
     const float* trans_data,           //
     const int sender_id_group_base,    //
-    float* image_data,                 //
-    int* count_data                   //
+    float* global_image_data,          //
+    int* global_count_data             //
 ) {
   // senders
+  const int sender_offset = gridDim.z;
   const int sender_id = gridDim.z + sender_id_group_base;
   const float sender_coord_x = dev_ele_coord_x[sender_id];
   const float sender_coord_y = dev_ele_coord_y[sender_id];
@@ -74,27 +75,39 @@ __global__ void fast_calc_kernel(      //
 
   const float dis_snd = distance(pixel_coord_x, pixel_coord_y,    //
                                  sender_coord_x, sender_coord_y);
-  // const int recv_region = 1;
-
-  float fuck = 1.0;
   bool valid_flag = check_validity(sender_coord_x, sender_coord_y,
                                    pixel_coord_x, pixel_coord_y);
 
   if (valid_flag) {
+    // float fuck = 1.0;
     const int recv_region = 244 * sqrtf(10 * dis_snd);
-    int beg_recv_id = sender_id - recv_region + 1;
-    int end_recv_id = sender_id + recv_region;
+    const int beg_recv_id = sender_id - recv_region + 1;
+    const int end_recv_id = sender_id + recv_region;
     float sum_image_data = 0.0;
-    int sum_count_data;
-    for (int recv_id = beg_recv_id; recv_id < end_recv_id; ++recv_id) {
+    int sum_count_data = 0;
+    for (int recv_id_iter = beg_recv_id; recv_id_iter < end_recv_id;
+         ++recv_id_iter) {
       // TODO: use some trick to fast kill unnecessary points
       // fuck *= 1.2 + pixel_coord_x - pixel_coord_y;
-      // float dis_recv = distance(pixel_coord_x, pixel_coord_y, recv_coord_x, recv_coord_y);
-
+      const int recv_id = (recv_id_iter + 2048) % 2048;
+      const float recv_coord_x = dev_ele_coord_x[recv_id_iter];
+      const float recv_coord_y = dev_ele_coord_y[recv_id_iter];
+      const float dis_recv =
+          distance(pixel_coord_x, pixel_coord_y, recv_coord_x, recv_coord_y);
+      const int waves = round((dis_snd + dis_recv) / SOUND_SPEED * FS);
+      const int magic = waves + MIDDOT + (OD - 1 - 1) / 2;
+      if (magic > 100 && magic <= POINT_LENGTH) {
+        const float image = trans_data[recv_id + magic * ELE_NO +
+                                       sender_offset * ELE_NO * NSAMPLE];
+        sum_image_data += image;
+        sum_count_data++;
+      }
       // int waves = (dis_snd + dis_recv) / SOUND_SPEED * FS + 0.5;
     }
-    image_data[pixel_idx * PIC_RESOLUTION + pixel_idy] += fuck;
-    // count_data[pixel_idx * PIC_RESOLUTION + pixel_idy] += 1;
+    int overall_offset = pixel_idx * PIC_RESOLUTION + pixel_idy;
+    atomicAdd(global_image_data + overall_offset, sum_image_data);
+    atomicAdd(global_image_data + overall_offset, sum_count_data);
+    // count_data[] += 1;
   }
 }
 
