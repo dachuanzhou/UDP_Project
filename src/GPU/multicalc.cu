@@ -86,10 +86,13 @@ __global__ void calc_func(const int ele_emit_id, float *image_data,
         if ((magic > 100) && (magic <= point_length)) {
           // 2 * R * dis_snd * cosTheta
           // = R^2 + dis_snd^2 - |(x, y)|^2
-          float angle = acosf(
-            (radius * radius + dis_snd * dis_snd - dis_origin * dis_origin) /
-            2 / radius / dis_snd);
-          if ((angle < PI / 9)) {
+          // float angle = acosf(
+          //   (radius * radius + dis_snd * dis_snd - dis_origin * dis_origin) /
+          //   2 / radius / dis_snd);
+          bool angle_flag = check_validity(dev_ele_coord_x[send_id], dev_ele_coord_y[send_id], 
+            sample_coord_x, sample_coord_y
+          );
+          if (angle_flag) {
             sum_image += trans_sdata[recv_id + magic * ELE_NO +
                                      step_offset * ELE_NO * NSAMPLE] *
                          expf(tgc * (waves - 1));

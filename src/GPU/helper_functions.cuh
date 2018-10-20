@@ -52,6 +52,30 @@ __global__ void add(float *sumdata, int *sumpoint, float *imagedata,
   }
 }
 
+// tanf(pi/9)
+const float tanpi_9 = 0.36397023426620234;
+__device__ bool check_validity(    //
+    float sender_coord_x,          //
+    float sender_coord_y,          //
+    float pixel_coord_x,           //
+    float pixel_coord_y            //
+) {
+  // TODO: try to skip most fucking calculation here
+  //  TODO: use angle wisely
+  float r_base = -sender_coord_x;
+  float im_base = -sender_coord_y;
+  float r_target = (pixel_coord_x - sender_coord_x);
+  float im_target = (pixel_coord_y - sender_coord_y);
+  // complex calc: ~base * target
+  float r_compute = r_base * r_target + im_base * im_target;
+  float im_compute = r_base * im_target - im_base * r_target;
+  bool angle = (r_compute >= 0 && (abs(im_compute / r_compute) < tanpi_9));
+  // printf("[%f-%f-%f-%f]", r_compute, im_compute);
+  bool range = r_compute < RADIUS * RADIUS * 1.1;
+  return angle && range ;
+  // return angle;
+}
+
 void get_ele_position(float *ele_coord_x, float *ele_coord_y) {
   float rfocus = RADIUS;
   float ele_angle = (2 * PI * 43.4695 / (256 - 1)) / 360;    //阵元间隔角度
