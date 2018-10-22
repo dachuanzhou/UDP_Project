@@ -17,7 +17,7 @@ using std::ofstream;
 #include "device_launch_parameters.h"
 
 #include "../header/define.hpp"
-constexpr int DEBUG_SAMPLE_RATE_REV = 32;
+constexpr int DEBUG_SAMPLE_RATE_REV = 1;
 int parallel_emit_sum = 1;    // 并行处理多个发射节点，优化使用
 
 __device__ float dev_ele_coord_x[ELE_NO];    // 写到纹理内存里面
@@ -129,7 +129,7 @@ int main(int argc, char const *argv[]) {
       exit(-1);
       break;
   }
-  parallel_emit_sum = 16;
+  // parallel_emit_sum = 16;
 
   cudaError_t cudaStatus;
 
@@ -296,7 +296,7 @@ int main(int argc, char const *argv[]) {
     }
     // cudaError_t cudaStatus = calcWithCuda(
     // i,dev_sumdata,dev_sumpoint,dev_filtered_data);
-    ::cudaDeviceSynchronize();
+    // ::cudaDeviceSynchronize();
   }
   cudaStatus = cudaMemcpy(image_data, dev_sumdata,
                           PIC_RESOLUTION * PIC_RESOLUTION * sizeof(float),

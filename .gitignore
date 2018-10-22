@@ -11,4 +11,4 @@ test*
 **/.*
 *.png
 **/origin.txt
-
+Release/*.txt

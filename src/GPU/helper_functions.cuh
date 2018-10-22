@@ -71,7 +71,7 @@ __device__ bool check_validity(    //
   float im_compute = r_base * im_target - im_base * r_target;
   bool angle = (r_compute > 0 && (abs(im_compute / r_compute) < tanpi_9));
   // printf("[%f-%f-%f-%f]", r_compute, im_compute);
-  bool range = r_compute < RADIUS * RADIUS * 1.1;
+  bool range = r_compute < RADIUS * RADIUS * 1.0;
   return angle && range ;
   // return angle;
 }
