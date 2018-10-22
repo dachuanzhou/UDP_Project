@@ -43,9 +43,10 @@ __global__ void fast_calc_kernel(      //
   const float sender_coord_x = dev_ele_coord_x[sender_id];
   const float sender_coord_y = dev_ele_coord_y[sender_id];
 
+  constexpr int MASK = 0x7;
   // pixels
-  const int pixel_offset_x = threadIdx.y;
-  const int pixel_offset_y = threadIdx.x;
+  const int pixel_offset_x = (threadIdx.y & MASK) | (threadIdx.x & ~MASK);
+  const int pixel_offset_y = (threadIdx.x & MASK) | (threadIdx.y & ~MASK);
   const int pixel_idx = pixel_offset_x + blockIdx.y * blockDim.y;
   const int pixel_idy = pixel_offset_y + blockIdx.x * blockDim.x;
   // if(pixel_idx >= 2046 && pixel_idy >= 2046){
