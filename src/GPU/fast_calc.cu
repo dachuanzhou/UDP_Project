@@ -18,7 +18,7 @@ using std::ofstream;
 #include "device_launch_parameters.h"
 
 #include "../header/define.hpp"
-constexpr int DEBUG_SAMPLE_RATE_REV = 32;
+constexpr int DEBUG_SAMPLE_RATE_REV = 1;
 int parallel_emit_sum = 1;    // 并行处理多个发射节点，优化使用
 
 __device__ float dev_ele_coord_x[ELE_NO];    // 写到纹理内存里面
@@ -43,9 +43,10 @@ cudaError_t precalcWithCuda(short *dev_data_samples_in_process, int ele_emit_id,
   // kernel3 filter
   auto begin = std::chrono::high_resolution_clock::now();
   cudaMemset(dev_filtered_data, 0,
-             NSAMPLE * ELE_NO * sizeof(short) * parallel_emit_sum * 2);
+             NSAMPLE * ELE_NO * sizeof(float) * parallel_emit_sum);
   filter_func<<<4 * parallel_emit_sum, 512>>>(dev_filtered_data,
                                               dev_data_samples_in_process);
+  // fast_filter(dev_filtered_data, 2048 * parallel_emit_sum);
   cudaDeviceSynchronize();
   auto end = std::chrono::high_resolution_clock::now();
   total_time_consumption += std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count();
