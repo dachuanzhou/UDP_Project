@@ -152,12 +152,19 @@ int main(int argc, char const *argv[]) {
     return -1;
   }
   float filter_data[OD];
-  for (int ii = 0; ii < OD; ii++) {
-    file_read.read((char *)&filter_data[ii], sizeof(float));
-  }
+  // for (int ii = 0; ii < OD; ii++) {
+  file_read.read((char*)filter_data, OD * sizeof(float));
+  // }
   file_read.close();
+  float filter_data_reverse[OD];
+  for(int i = 0; i < OD; ++i){
+    filter_data_reverse[i] = filter_data[OD - i];
+  }
   cudaStatus =
     cudaMemcpyToSymbol(dev_filter_data, filter_data, sizeof(float) * OD);
+
+  cudaStatus =
+    cudaMemcpyToSymbol(dev_filter_data_reverse, filter_data_reverse, sizeof(float) * OD);
 
   if (cudaStatus != cudaSuccess) {
     cout << "center Fail to cudaMemcpyToSymbol on GPU" << endl;

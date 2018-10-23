@@ -74,12 +74,11 @@ __global__ void fast_filter_kernel(float* filtered_data,
     if (sample_id >= NSAMPLE) {
       break;
     }
-    float sum = 0;
+    double sum = 0;
     int k_end = min(OD, NSAMPLE - sample_block_base - sample_id);
     for (int k = 0; k < k_end; ++k) {
       sum += sh_data_in_process[k + sample_id][recv_offset] *
              dev_filter_data_reverse[k];
-      1;
     }
     filtered_data[io_base + sample_id * ELE_NO + recv_offset] = sum;
   }
