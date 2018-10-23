@@ -84,7 +84,6 @@ __global__ void fast_filter_kernel(float* filtered_data,
     }
     filtered_data[io_base + sample_id * ELE_NO + recv_offset] = sum;
   }
-  __syncthreads();
 }
 
 void fast_filter(float* filtered_data, const short* data_in_process,

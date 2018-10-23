@@ -47,7 +47,7 @@ cudaError_t precalcWithCuda(short *dev_data_samples_in_process, int ele_emit_id,
   // filter_func<<<4 * parallel_emit_sum, 512>>>(dev_filtered_data,
   //                                             dev_data_samples_in_process);
   fast_filter(dev_filtered_data, dev_data_samples_in_process, parallel_emit_sum);
-  // fast_filter(dev_filtered_data, 2048 * parallel_emit_sum);
+
   cudaDeviceSynchronize();
   auto end = std::chrono::high_resolution_clock::now();
   total_time_consumption += std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count();
