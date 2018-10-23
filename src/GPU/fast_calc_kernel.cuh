@@ -61,8 +61,9 @@ __global__ void fast_filter_kernel(float* filtered_data,
     if (sample_id + sample_block_base < NSAMPLE && sample_id < sample_id_end) {
       sh_data_in_process[sample_id][pixel_offset] =
           data_in_process[data_base + sample_id * NSAMPLE + pixel_offset];
+    } else {
+      break;
     }
-    { break; }
   }
   __syncthreads();
 
@@ -84,8 +85,8 @@ __global__ void fast_filter_kernel(float* filtered_data,
 
 void fast_filter(float* filtered_data, const short* data_in_process,
                  int parallel_emit_sum) {
-  dim3 grid_param(PIC_RESOLUTION * PIC_RESOLUTION / 32,
-                  (NSAMPLE + 255) / 255, parallel_emit_sum);
+  dim3 grid_param(PIC_RESOLUTION * PIC_RESOLUTION / 32, (NSAMPLE + 255) / 255,
+                  parallel_emit_sum);
   dim3 block_param(32, 32);
   fast_filter_kernel<<<grid_param, block_param>>>(filtered_data,
                                                   data_in_process);

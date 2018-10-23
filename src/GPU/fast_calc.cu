@@ -42,10 +42,11 @@ cudaError_t precalcWithCuda(short *dev_data_samples_in_process, int ele_emit_id,
   // kernel 1,kernel2 decode
   // kernel3 filter
   auto begin = std::chrono::high_resolution_clock::now();
-  cudaMemset(dev_filtered_data, 0,
-             NSAMPLE * ELE_NO * sizeof(float) * parallel_emit_sum);
-  filter_func<<<4 * parallel_emit_sum, 512>>>(dev_filtered_data,
-                                              dev_data_samples_in_process);
+  // cudaMemset(dev_filtered_data, 0,
+  //            NSAMPLE * ELE_NO * sizeof(float) * parallel_emit_sum);
+  // filter_func<<<4 * parallel_emit_sum, 512>>>(dev_filtered_data,
+  //                                             dev_data_samples_in_process);
+  fast_filter(dev_filter_data, dev_data_samples_in_process, parallel_emit_sum);
   // fast_filter(dev_filtered_data, 2048 * parallel_emit_sum);
   cudaDeviceSynchronize();
   auto end = std::chrono::high_resolution_clock::now();
