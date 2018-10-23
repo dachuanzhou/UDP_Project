@@ -54,7 +54,7 @@ __global__ void fast_filter_kernel(float* filtered_data,
   const int sample_block_base = blockIdx.y * 256;
   const int emit_id = blockIdx.z;
   const int io_base = emit_id * NSAMPLE * ELE_NO +
-                        sample_block_base * NSAMPLE + (blockIdx.x * 32) * 1;
+                        sample_block_base * ELE_NO + (blockIdx.x * 32) * 1;
   const int sample_id_end = 256 + OD - 1;
   for (int sample_id_base = 0; sample_id_base < sample_id_end;
        sample_id_base += 32) {
@@ -62,7 +62,7 @@ __global__ void fast_filter_kernel(float* filtered_data,
     const int sample_id = sample_id_base + sample_offset;
     if (sample_id + sample_block_base < NSAMPLE && sample_id < sample_id_end) {
       sh_data_in_process[sample_id][recv_offset] =
-          data_in_process[io_base + sample_id * NSAMPLE + recv_offset];
+          data_in_process[io_base + sample_id * ELE_NO + recv_offset];
     } else {
       break;
     }
@@ -82,7 +82,7 @@ __global__ void fast_filter_kernel(float* filtered_data,
       sum += sh_data_in_process[k + sample_id][recv_offset] *
              dev_filter_data[OD - 1 - k];
     }
-    filtered_data[io_base + sample_id * NSAMPLE + recv_offset] = sum;
+    filtered_data[io_base + sample_id * ELE_NO + recv_offset] = sum;
   }
   __syncthreads();
 }
