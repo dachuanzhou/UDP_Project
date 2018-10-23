@@ -28,6 +28,7 @@ bool __device__ __host__ is_close(int delta, int range) {
 }
 
 // 滤波函数
+// 2048 * emit_sum
 __global__ void filter_func(float *filtered_data, short *data_in_process) {
   int column_id = blockDim.x * blockIdx.x + threadIdx.x;
   for (int sample_cnt = 0; sample_cnt < NSAMPLE; sample_cnt++) {
