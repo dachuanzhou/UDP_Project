@@ -28,6 +28,21 @@ int bin_search(F f, int beg, int end) {
   return beg;
 }
 
+// 滤波函数
+__global__ void fast_filter(float* filtered_data, short* data_in_process) {
+  int column_id = blockDim.x * blockIdx.x + threadIdx.x;
+  for (int sample_cnt = 0; sample_cnt < NSAMPLE; sample_cnt++) {
+    for (int j = 0; sample_cnt >= j && j < OD; j++) {
+      filtered_data[(column_id / 2048) * ELE_NO * NSAMPLE +
+                    sample_cnt * ELE_NO + column_id % 2048] +=
+          (dev_filter_data[j] *
+           data_in_process[(sample_cnt - j) * ELE_NO +
+                           (column_id / 2048) * ELE_NO * NSAMPLE +
+                           column_id % 2048]);
+    }
+  }
+}
+
 // grid param: <pixel_group_idy, pixel_group_idx, sender_offset>
 // block param: <pixel_offset_idy, pixel_offset_idx>
 // for loop size is roughly equal for each block, never panic
@@ -43,10 +58,15 @@ __global__ void fast_calc_kernel(      //
   const float sender_coord_x = dev_ele_coord_x[sender_id];
   const float sender_coord_y = dev_ele_coord_y[sender_id];
 
-  constexpr int MASK = 0x7;
-  // pixels
-  const int pixel_offset_x = (threadIdx.y & MASK) | (threadIdx.x & ~MASK);
-  const int pixel_offset_y = (threadIdx.x & MASK) | (threadIdx.y & ~MASK);
+  // // pixels
+  // constexpr int MASK_OFFSET = 3;
+  // constexpr int MASK = (1 << MASK_OFFSET) - 1;
+  // const int pixel_offset_x =
+  //     ((threadIdx.x & ~MASK) >> MASK_OFFSET) | ((threadIdx.y & MASK) << (5 - MASK_OFFSET));
+  // const int pixel_offset_y = (threadIdx.x & MASK) | (threadIdx.y & ~MASK);
+
+  const int pixel_offset_x = threadIdx.x;
+  const int pixel_offset_y = threadIdx.y;
   const int pixel_idx = pixel_offset_x + blockIdx.y * blockDim.y;
   const int pixel_idy = pixel_offset_y + blockIdx.x * blockDim.x;
   // if(pixel_idx >= 2046 && pixel_idy >= 2046){
@@ -82,8 +102,8 @@ __global__ void fast_calc_kernel(      //
       const int magic = waves + MIDDOT + (OD - 1 - 1) / 2;
       if (magic > 100 && magic <= POINT_LENGTH) {
         const float image = trans_data[recv_id + magic * ELE_NO +
-                                        sender_offset * ELE_NO * NSAMPLE] *
-                             expf(TGC * (waves - 1));
+                                       sender_offset * ELE_NO * NSAMPLE] *
+                            expf(TGC * (waves - 1));
         sum_image_data += image;
         sum_count_data++;
       }

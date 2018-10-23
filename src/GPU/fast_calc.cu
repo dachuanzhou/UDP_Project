@@ -5,6 +5,7 @@
 #include <random>
 #include <sstream>
 #include <string>
+#include <chrono>
 using std::cin;
 using std::cout;
 using std::endl;
@@ -17,7 +18,7 @@ using std::ofstream;
 #include "device_launch_parameters.h"
 
 #include "../header/define.hpp"
-constexpr int DEBUG_SAMPLE_RATE_REV = 1;
+constexpr int DEBUG_SAMPLE_RATE_REV = 32;
 int parallel_emit_sum = 1;    // 并行处理多个发射节点，优化使用
 
 __device__ float dev_ele_coord_x[ELE_NO];    // 写到纹理内存里面
@@ -30,6 +31,8 @@ __device__ float dev_filter_data[OD];        // filter parameter
 float image_data[PIC_RESOLUTION * PIC_RESOLUTION] = {0};
 int image_point_count[PIC_RESOLUTION * PIC_RESOLUTION] = {0};
 
+
+static double total_time_consumption = 0;
 cudaError_t precalcWithCuda(short *dev_data_samples_in_process, int ele_emit_id,
                             float *dev_sumdata, int *dev_sumpoint,
                             float *dev_filtered_data, float *dev_imagedata,
@@ -38,11 +41,14 @@ cudaError_t precalcWithCuda(short *dev_data_samples_in_process, int ele_emit_id,
 
   // kernel 1,kernel2 decode
   // kernel3 filter
+  auto begin = std::chrono::high_resolution_clock::now();
   cudaMemset(dev_filtered_data, 0,
              NSAMPLE * ELE_NO * sizeof(short) * parallel_emit_sum * 2);
   filter_func<<<4 * parallel_emit_sum, 512>>>(dev_filtered_data,
                                               dev_data_samples_in_process);
-  // cudaStatus = cudaDeviceSynchronize();
+  cudaDeviceSynchronize();
+  auto end = std::chrono::high_resolution_clock::now();
+  total_time_consumption += std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count();
 
   // dim3 gridimage(PIC_RESOLUTION, PIC_RESOLUTION);
   // // dim3 threads(RCV_OFFSET);
@@ -322,6 +328,7 @@ int main(int argc, char const *argv[]) {
   over = time(NULL);
   cout << "Running time is : " << (int)difftime(over, start) / 60 << "min "
        << (int)difftime(over, start) % 60 << "s." << endl;
+  cout << "Crucial time is: " << total_time_consumption / 1000 << endl;
   cudaFree(dev_sumdata);
   cudaFree(dev_sumpoint);
   cudaFree(dev_data_samples_in_process);
