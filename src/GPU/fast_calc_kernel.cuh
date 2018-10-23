@@ -53,15 +53,16 @@ __global__ void fast_filter_kernel(float* filtered_data,
   const int sample_offset = threadIdx.y;
   const int sample_block_base = blockIdx.y * 256;
   const int emit_id = blockIdx.z;
-  const int data_base = emit_id * NSAMPLE * ELE_NO +
+  const int io_base = emit_id * NSAMPLE * ELE_NO +
                         sample_block_base * NSAMPLE + (blockIdx.x * 32) * 1;
   const int sample_id_end = 256 + OD - 1;
   for (int sample_id_base = 0; sample_id_base < sample_id_end;
        sample_id_base += 32) {
+
     const int sample_id = sample_id_base + sample_offset;
     if (sample_id + sample_block_base < NSAMPLE && sample_id < sample_id_end) {
       sh_data_in_process[sample_id][recv_offset] =
-          data_in_process[data_base + sample_id * NSAMPLE + recv_offset];
+          data_in_process[io_base + sample_id * NSAMPLE + recv_offset];
     } else {
       break;
     }
@@ -75,18 +76,20 @@ __global__ void fast_filter_kernel(float* filtered_data,
     }
     float sum = 0;
     for (int k = 0; k < OD; ++k) {
-      if (sample_id + k >= NSAMPLE) {
+      if (sample_block_base + sample_id + k >= NSAMPLE) {
         break;
       }
       sum += sh_data_in_process[k + sample_id][recv_offset] *
              dev_filter_data[OD - 1 - k];
     }
+    filtered_data[io_base + sample_id * NSAMPLE + recv_offset] = sum;
   }
+  __syncthreads();
 }
 
 void fast_filter(float* filtered_data, const short* data_in_process,
                  int parallel_emit_sum) {
-  dim3 grid_param(ELE_NO / 32, (NSAMPLE + 255) / 255,
+  dim3 grid_param(ELE_NO / 32, (NSAMPLE + 255) / 256,
                   parallel_emit_sum);
   dim3 block_param(32, 32);
   fast_filter_kernel<<<grid_param, block_param>>>(filtered_data,
