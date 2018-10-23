@@ -28,19 +28,52 @@ int bin_search(F f, int beg, int end) {
   return beg;
 }
 
-// 滤波函数
-__global__ void fast_filter(float* filtered_data, short* data_in_process) {
-  int column_id = blockDim.x * blockIdx.x + threadIdx.x;
-  for (int sample_cnt = 0; sample_cnt < NSAMPLE; sample_cnt++) {
-    for (int j = 0; sample_cnt >= j && j < OD; j++) {
-      filtered_data[(column_id / 2048) * ELE_NO * NSAMPLE +
-                    sample_cnt * ELE_NO + column_id % 2048] +=
-          (dev_filter_data[j] *
-           data_in_process[(sample_cnt - j) * ELE_NO +
-                           (column_id / 2048) * ELE_NO * NSAMPLE +
-                           column_id % 2048]);
+// // 滤波函数
+// __global__ void fast_filter(float* filtered_data, short* data_in_process) {
+//   int column_id = blockDim.x * blockIdx.x + threadIdx.x;
+//   for (int sample_cnt = 0; sample_cnt < NSAMPLE; sample_cnt++) {
+//     for (int j = 0; sample_cnt >= j && j < OD; j++) {
+//       filtered_data[(column_id / 2048) * ELE_NO * NSAMPLE +
+//                     sample_cnt * ELE_NO + column_id % 2048] +=
+//           (dev_filter_data[j] *
+//            data_in_process[(sample_cnt - j) * ELE_NO +
+//                            (column_id / 2048) * ELE_NO * NSAMPLE +
+//                            column_id % 2048]);
+//     }
+//   }
+// }
+
+// blockIdx: <pixel_y_group_id with pixel_idx, NSAMPLE_group_id, parallel_emit_sum>
+// threadIdx: <pixel_y_offset, read_block_idx>
+__global__ void fast_filter_kernel(float* filtered_data,
+                                   const short* data_in_process) {
+  __shared__ short* sh_data_in_process[256 + 63][32];
+  const int pixel_offset = threadIdx.x;
+  const int sample_offset = threadIdx.y;
+  const int sample_block_base = blockIdx.y * 256;
+  const int data_base = blockIdx.z * NSAMPLE * ELE_NO +
+                        sample_block_base * NSAMPLE + (blockIdx.x * 32) * 1;
+  for (int sample_base = 0; sample_base < 256; sample_base += 32) {
+    int sample_id = sample_base + sample_offset;
+    if (sample_id + sample_block_base < NSAMPLE) {
+      sh_data_in_process[sample_id][pixel_offset] =
+          data_in_process[data_base + sample_id * NSAMPLE + pixel_offset];
+    } else {
+      break;
     }
   }
+  __syncthreads();
+
+  for(int sample_id = 0; sample_id < 256; sample_id++){
+    for(int k = 0; k < OD; ++k){
+      
+    }
+  }
+}
+
+void fast_filter(float* filtered_data, const short* data_in_process,
+                 int parallel_emit_sum) {
+  // shared memory = 48K, use 32K = 32 * 2B * (256 + 64) !good
 }
 
 // grid param: <pixel_group_idy, pixel_group_idx, sender_offset>
