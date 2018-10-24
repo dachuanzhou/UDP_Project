@@ -147,7 +147,7 @@ __global__ void fast_calc_kernel(      //
       const float dis_recv =
           distance(pixel_coord_x, pixel_coord_y, recv_coord_x, recv_coord_y);
       const int waves = (dis_snd + dis_recv) / SOUND_SPEED * FS + 0.5;
-      const int magic = waves + MIDDOT;
+      const int magic = waves + MIDDOT - OD / 2;
       if (magic > 100 && magic <= POINT_LENGTH) {
         const float image = trans_data[recv_id + magic * ELE_NO +
                                        sender_offset * ELE_NO * NSAMPLE] *
