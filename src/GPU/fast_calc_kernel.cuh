@@ -53,27 +53,18 @@ __global__ void fast_filter_kernel(float* filtered_data,
   const int sample_offset = threadIdx.y;
   const int sample_block_base = blockIdx.y * 256;
   const int emit_id = blockIdx.z;
-  const int io_base = emit_id * NSAMPLE * ELE_NO +
-                        sample_block_base * ELE_NO + (blockIdx.x * 32) * 1;
-  const int sample_id_end = 256 + OD - 1;
-  for (int sample_id_base = 0; sample_id_base < sample_id_end;
-       sample_id_base += 32) {
-
-    const int sample_id = sample_id_base + sample_offset;
-    if (sample_id + sample_block_base < NSAMPLE && sample_id < sample_id_end) {
-      sh_data_in_process[sample_id][recv_offset] =
-          data_in_process[io_base + sample_id * ELE_NO + recv_offset];
-    } else {
-      break;
-    }
+  const int io_base = emit_id * NSAMPLE * ELE_NO + sample_block_base * ELE_NO +
+                      (blockIdx.x * 32) * 1;
+  int sample_id_end = min(NSAMPLE - sample_block_base, 256 + OD - 1);
+  for (int sample_id = sample_offset; sample_id < sample_id_end;
+       sample_id += 32) {
+    sh_data_in_process[sample_id][recv_offset] =
+        data_in_process[io_base + sample_id * ELE_NO + recv_offset];
   }
   __syncthreads();
 
-  for (int sample_id_base = 0; sample_id_base < 256; sample_id_base += 32) {
-    const int sample_id = sample_id_base + sample_offset;
-    if (sample_id >= NSAMPLE) {
-      break;
-    }
+  sample_id_end = min(NSAMPLE - sample_block_base, 256);
+  for (int sample_id = sample_offset; sample_id < sample_id_end; sample_id += 32) {
     double sum = 0;
     int k_end = min(OD, NSAMPLE - sample_block_base - sample_id);
     for (int k = 0; k < k_end; ++k) {
@@ -86,8 +77,7 @@ __global__ void fast_filter_kernel(float* filtered_data,
 
 void fast_filter(float* filtered_data, const short* data_in_process,
                  int parallel_emit_sum) {
-  dim3 grid_param(ELE_NO / 32, (NSAMPLE + 255) / 256,
-                  parallel_emit_sum);
+  dim3 grid_param(ELE_NO / 32, (NSAMPLE + 255) / 256, parallel_emit_sum);
   dim3 block_param(32, 32);
   fast_filter_kernel<<<grid_param, block_param>>>(filtered_data,
                                                   data_in_process);
