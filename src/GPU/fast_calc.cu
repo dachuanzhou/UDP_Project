@@ -157,9 +157,12 @@ int main(int argc, char const *argv[]) {
   // }
   file_read.close();
   float filter_data_reverse[OD];
+  // cout << ">>";
   for(int i = 0; i < OD; ++i){
-    filter_data_reverse[i] = filter_data[OD - i];
+    filter_data_reverse[i] = filter_data[OD - 1 - i];
+    // cout << filter_data[OD - 1 - i] << " ";
   }
+  // cout << endl;
   cudaStatus =
     cudaMemcpyToSymbol(dev_filter_data, filter_data, sizeof(float) * OD);
 
