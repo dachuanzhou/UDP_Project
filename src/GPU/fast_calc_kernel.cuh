@@ -108,15 +108,15 @@ __global__ void fast_calc_kernel(      //
   const float sender_coord_x = dev_ele_coord_x[sender_id];
   const float sender_coord_y = dev_ele_coord_y[sender_id];
 
-  // // pixels
-  // constexpr int MASK_OFFSET = 3;
-  // constexpr int MASK = (1 << MASK_OFFSET) - 1;
-  // const int pixel_offset_x =
-  //     ((threadIdx.x & ~MASK) >> MASK_OFFSET) | ((threadIdx.y & MASK) << (5 - MASK_OFFSET));
-  // const int pixel_offset_y = (threadIdx.x & MASK) | (threadIdx.y & ~MASK);
+  // pixels 
+  constexpr int MASK_OFFSET = 3;
+  constexpr int MASK = (1 << MASK_OFFSET) - 1;
+  const int pixel_offset_x =
+      ((threadIdx.x & ~MASK) >> MASK_OFFSET) | ((threadIdx.y & MASK) << (5 - MASK_OFFSET));
+  const int pixel_offset_y = (threadIdx.x & MASK) | (threadIdx.y & ~MASK);
 
-  const int pixel_offset_x = threadIdx.x;
-  const int pixel_offset_y = threadIdx.y;
+  // const int pixel_offset_x = threadIdx.x;
+  // const int pixel_offset_y = threadIdx.y;
   const int pixel_idx = pixel_offset_x + blockIdx.y * blockDim.y;
   const int pixel_idy = pixel_offset_y + blockIdx.x * blockDim.x;
   // if(pixel_idx >= 2046 && pixel_idy >= 2046){
