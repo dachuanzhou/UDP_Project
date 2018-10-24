@@ -2,7 +2,7 @@
 #ifndef __CONST_VALUE__
 #define __CONST_VALUE__
 constexpr auto PI = 3.14159265358979323846;
-constexpr auto PIC_RESOLUTION = 2048;    // 出图的分辨率：N x N, must be multiple of 64
+constexpr auto PIC_RESOLUTION = 10240;    // 出图的分辨率：N x N, must be multiple of 64
 
 // 接收阵元到发射阵元的最大距离（阵元个数），所以接收孔径为2*M+1
 constexpr auto RCV_OFFSET = 256;
