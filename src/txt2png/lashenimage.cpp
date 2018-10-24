@@ -9,6 +9,7 @@
 #include <cv.h>
 #include <highgui.h>
 #include "cvaux.h"
+#include "../header/define.hpp"
 
 using namespace cv;
 
@@ -17,7 +18,7 @@ using namespace cv;
 using namespace std;
 #define max(x, y) ((x) < (y) ? (y) : (x))
 #define min(x, y) ((x) > (y) ? (y) : (x))
-int no_lines = 2048;
+int no_lines = PIC_RESOLUTION;
 
 void medianfilter(float *image, float *result, int N);
 void _medianfilter(float *image, float *result, int N);
