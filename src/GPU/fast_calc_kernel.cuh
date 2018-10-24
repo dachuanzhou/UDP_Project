@@ -132,8 +132,6 @@ __global__ void fast_calc_kernel(      //
                                    pixel_coord_x, pixel_coord_y);
 
   if (valid_flag) {
-    // float fuck = 1.0;
-
     const int recv_region = min((int)(244 * sqrtf(10 * dis_snd)), RCV_OFFSET);
     const int beg_recv_id = sender_id - recv_region + 1;
     const int end_recv_id = sender_id + recv_region;
@@ -149,7 +147,7 @@ __global__ void fast_calc_kernel(      //
       const float dis_recv =
           distance(pixel_coord_x, pixel_coord_y, recv_coord_x, recv_coord_y);
       const int waves = (dis_snd + dis_recv) / SOUND_SPEED * FS + 0.5;
-      const int magic = waves + MIDDOT + (OD - 1 - 1) / 2;
+      const int magic = waves + MIDDOT;
       if (magic > 100 && magic <= POINT_LENGTH) {
         const float image = trans_data[recv_id + magic * ELE_NO +
                                        sender_offset * ELE_NO * NSAMPLE] *
