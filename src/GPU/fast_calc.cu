@@ -33,56 +33,19 @@ float image_data[PIC_RESOLUTION * PIC_RESOLUTION] = {0};
 int image_point_count[PIC_RESOLUTION * PIC_RESOLUTION] = {0};
 
 
-static double total_time_consumption = 0;
+// static double total_time_consumption = 0;
 cudaError_t precalcWithCuda(short *dev_data_samples_in_process, int ele_emit_id,
                             float *dev_sumdata, int *dev_sumpoint,
                             float *dev_filtered_data, float *dev_imagedata,
                             int *dev_pointcount, int parallel_emit_sum) {
   cudaError_t cudaStatus;
-
-  // kernel 1,kernel2 decode
-  // kernel3 filter
-  auto begin = std::chrono::high_resolution_clock::now();
-  // cudaMemset(dev_filtered_data, 0,
-  //            NSAMPLE * ELE_NO * sizeof(float) * parallel_emit_sum);
-  // filter_func<<<4 * parallel_emit_sum, 512>>>(dev_filtered_data,
-  //                                             dev_data_samples_in_process);
+  // auto begin = std::chrono::high_resolution_clock::now();
   fast_filter(dev_filtered_data, dev_data_samples_in_process, parallel_emit_sum);
-
-  cudaDeviceSynchronize();
-  auto end = std::chrono::high_resolution_clock::now();
-  total_time_consumption += std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count();
-
-  // dim3 gridimage(PIC_RESOLUTION, PIC_RESOLUTION);
-  // // dim3 threads(RCV_OFFSET);
-  // calc_func<<<gridimage, 2 * RCV_OFFSET>>>(
-  //   ele_emit_id, dev_imagedata, dev_pointcount, dev_filtered_data,
-  //   parallel_emit_sum);    //启动一个二维的PIC_RESOLUTION*PIC_RESOLUTION个block，每个block里面RCV_OFFSET个thread
-
-
-
-
+  // auto end = std::chrono::high_resolution_clock::now(); total_time_consumption += std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count();
 
   fast_calc(dev_filtered_data, ele_emit_id, parallel_emit_sum, dev_sumdata, dev_sumpoint);
-
-  // // Check for any errors launching the kernel
+  // Check for any errors launching the kernel
   cudaStatus = cudaGetLastError();
-  // if (cudaStatus != cudaSuccess) {
-  //   cout << "calcKernel launch failed: " << cudaGetErrorString(cudaStatus);
-  //   // goto Error;
-  //   return cudaStatus;
-  // }
-  // // cudaDeviceSynchronize();
-
-  // //把所有的结果加到一起
-  // add<<<32, 32>>>(dev_sumdata, dev_sumpoint, dev_imagedata, dev_pointcount);
-  // cudaStatus = cudaGetLastError();
-  // if (cudaStatus != cudaSuccess) {
-  //   cout << "addKernel launch failed: " << cudaGetErrorString(cudaStatus);
-  //   // goto Error;
-  //   return cudaStatus;
-  // }
-
   return cudaStatus;
 }
 
@@ -138,7 +101,6 @@ int main(int argc, char const *argv[]) {
       exit(-1);
       break;
   }
-  // parallel_emit_sum = 16;
 
   cudaError_t cudaStatus;
 
@@ -152,9 +114,7 @@ int main(int argc, char const *argv[]) {
     return -1;
   }
   float filter_data[OD];
-  // for (int ii = 0; ii < OD; ii++) {
   file_read.read((char*)filter_data, OD * sizeof(float));
-  // }
   file_read.close();
   float filter_data_reverse[OD];
   // cout << ">>";
@@ -262,20 +222,21 @@ int main(int argc, char const *argv[]) {
         return -1;
     } */
 
-  float *dev_imagedata;
 
-  int *dev_pointcount;
+  // deprecated, removal by whoever
+  float *dev_imagedata = nullptr;
+  int *dev_pointcount = nullptr;
 
-  cudaStatus = cudaMalloc((void **)(&dev_imagedata),
-                          PIC_RESOLUTION * PIC_RESOLUTION * sizeof(float));
+  // cudaStatus = cudaMalloc((void **)(&dev_imagedata),
+                          // PIC_RESOLUTION * PIC_RESOLUTION * sizeof(float));
   /* if (cudaStatus != cudaSuccess)
     {
         cout << "imagedata Fail to cudaMalloc on GPU" << endl;
         //goto Error;
         return cudaStatus;
     } */
-  cudaStatus = cudaMalloc((void **)(&dev_pointcount),
-                          PIC_RESOLUTION * PIC_RESOLUTION * sizeof(int));
+  // cudaStatus = cudaMalloc((void **)(&dev_pointcount),
+                          // PIC_RESOLUTION * PIC_RESOLUTION * sizeof(int));
   /* if (cudaStatus != cudaSuccess)
     {
         cout << "pointcount Fail to cudaMalloc on GPU" << endl;
@@ -341,13 +302,14 @@ int main(int argc, char const *argv[]) {
   over = time(NULL);
   cout << "Running time is : " << (int)difftime(over, start) / 60 << "min "
        << (int)difftime(over, start) % 60 << "s." << endl;
-  cout << "Crucial time is: " << total_time_consumption / 1000 << endl;
+  // cout << "Crucial time is: " << total_time_consumption / 1000 << endl;
   cudaFree(dev_sumdata);
   cudaFree(dev_sumpoint);
   cudaFree(dev_data_samples_in_process);
   cudaFree(dev_filtered_data);
-  cudaFree(dev_imagedata);
-  cudaFree(dev_pointcount);
+
+  // cudaFree(dev_imagedata);
+  // cudaFree(dev_pointcount);
   // cudaStatus = cudaDeviceReset();
   // if (cudaStatus != cudaSuccess)
   // {
