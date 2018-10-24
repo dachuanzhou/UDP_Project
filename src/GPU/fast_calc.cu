@@ -18,7 +18,7 @@ using std::ofstream;
 #include "device_launch_parameters.h"
 
 #include "../header/define.hpp"
-constexpr int DEBUG_SAMPLE_RATE_REV = 32;
+constexpr int DEBUG_SAMPLE_RATE_REV = 1;
 int parallel_emit_sum = 1;    // 并行处理多个发射节点，优化使用
 
 __constant__ float dev_filter_data_reverse[OD];
